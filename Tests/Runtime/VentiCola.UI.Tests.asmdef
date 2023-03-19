@@ -1,0 +1,16 @@
+{
+    "name": "VentiCola.UI.Tests",
+    "rootNamespace": "",
+    "references": [
+        "GUID:6ea1bd8a97aa6354f9003cd8a2412504"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

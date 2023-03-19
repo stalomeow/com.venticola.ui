@@ -1,0 +1,20 @@
+{
+    "name": "VentiCola.UI.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:6ea1bd8a97aa6354f9003cd8a2412504"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Mono.Cecil.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
