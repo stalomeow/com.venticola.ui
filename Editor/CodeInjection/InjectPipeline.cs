@@ -10,11 +10,10 @@ using UnityEngine.Assertions;
 using VentiCola.UI.Internals;
 using VentiColaEditor.UI.CodeInjection.AssemblyInjectors;
 using VentiColaEditor.UI.Settings;
+using Debug = UnityEngine.Debug;
 
 namespace VentiColaEditor.UI.CodeInjection
 {
-    using Debug = UnityEngine.Debug;
-
     public static class InjectPipeline
     {
         private const string k_ForceRecompileAndInjectKey = "com.stalo.venticola.ui.force-recompile-inject";
@@ -186,12 +185,6 @@ namespace VentiColaEditor.UI.CodeInjection
         private static bool InjectCodesForAssemblies(IEnumerable<string> assemblyPaths)
         {
             var settings = UIProjectSettings.instance;
-
-            if (settings.CodeInjectionTasks == InjectionTasks.None)
-            {
-                return false;
-            }
-
             List<string> validAssemblyPaths = FilterAssemblyPaths(assemblyPaths, settings.CodeInjectionAssemblyWhiteList);
 
             if (validAssemblyPaths.Count == 0)
@@ -224,7 +217,7 @@ namespace VentiColaEditor.UI.CodeInjection
                     try
                     {
                         injectedAnyCode = InjectCodesForAssembly(assembly,
-                            settings.CodeInjectionTasks, settings.CodeInjectionLogLevel, injectorTypes, progressBarTitle);
+                            settings.CodeInjectionLogLevel, injectorTypes, progressBarTitle);
                     }
                     catch (Exception e)
                     {
@@ -245,6 +238,11 @@ namespace VentiColaEditor.UI.CodeInjection
                         }
                     }
                 }
+            }
+            catch (AccessViolationException)
+            {
+                Debug.LogWarning("AccessViolation, Retry!");
+                EditorApplication.delayCall += InjectCodesWithReload;
             }
             catch (Exception e)
             {
@@ -272,7 +270,7 @@ namespace VentiColaEditor.UI.CodeInjection
             assembly.CustomAttributes.Add(new CustomAttribute(ctorRef));
         }
 
-        private static bool InjectCodesForAssembly(AssemblyDefinition assembly, InjectionTasks tasks, LogLevel logLevel,
+        private static bool InjectCodesForAssembly(AssemblyDefinition assembly, LogLevel logLevel,
             TypeCache.TypeCollection injectorTypes, string progressBarTitle)
         {
             if (IsAssemblyInjected(assembly))
@@ -291,7 +289,6 @@ namespace VentiColaEditor.UI.CodeInjection
                 // init properties
                 injector.Assembly = assembly;
                 injector.Methods = methodCache;
-                injector.Tasks = tasks;
                 injector.LogLevel = logLevel;
                 injector.Progress = new SimpleProgress<float>(value =>
                 {

@@ -5,7 +5,7 @@ using VentiCola.UI.Internals;
 
 namespace VentiCola.UI
 {
-    public class ReactiveMap<TKey, TValue> : IOrderedCollection, IDictionary<TKey, TValue>
+    public class ReactiveMap<TKey, TValue> : IReactiveCollection, IDictionary<TKey, TValue>
     {
         private List<TKey> m_Keys;
         private Dictionary<TKey, TValue> m_Dict;
@@ -22,15 +22,15 @@ namespace VentiCola.UI
 
         int ICollection<KeyValuePair<TKey, TValue>>.Count => throw new NotImplementedException();
 
-        int IOrderedCollection.Count => throw new NotImplementedException();
+        int IReactiveCollection.Count => throw new NotImplementedException();
 
         bool ICollection<KeyValuePair<TKey, TValue>>.IsReadOnly => throw new NotImplementedException();
 
-        bool IOrderedCollection.HasKey => true;
-
-        Type IOrderedCollection.KeyType => typeof(TKey);
-
-        Type IOrderedCollection.ValueType => typeof(TValue);
+        // bool IReactiveCollection.HasKey => true;
+        //
+        // Type IReactiveCollection.KeyType => typeof(TKey);
+        //
+        // Type IReactiveCollection.ValueType => typeof(TValue);
 
         public KeyValuePair<TKey, TValue> GetAt(int index)
         {
@@ -48,14 +48,19 @@ namespace VentiCola.UI
             throw new NotImplementedException();
         }
 
-        T IOrderedCollection.CastAndGetKeyAt<T>(int index)
+        T IReactiveCollection.GetKeyAt<T>(Index index)
         {
             return CastUtility.CastAny<TKey, T>(m_Keys[index]);
         }
 
-        T IOrderedCollection.CastAndGetValueAt<T>(int index)
+        T IReactiveCollection.GetValueAt<T>(Index index)
         {
             return CastUtility.CastAny<TValue, T>(m_Dict[m_Keys[index]]);
+        }
+
+        public void CopyTo(ref IReactiveCollection destination, Range range)
+        {
+            throw new NotImplementedException();
         }
 
         void ICollection<KeyValuePair<TKey, TValue>>.Clear()

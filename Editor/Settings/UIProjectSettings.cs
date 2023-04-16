@@ -8,24 +8,13 @@ namespace VentiColaEditor.UI.Settings
     [FilePath("ProjectSettings/VentiCola/UIProjectSettings.asset", FilePathAttribute.Location.ProjectFolder)]
     public sealed class UIProjectSettings : ScriptableSingleton<UIProjectSettings>
     {
-        [SerializeField] private List<GlobalModelVar> m_GlobalModels = new();
         [SerializeField] private bool m_AutoCodeInjection = true;
-        [SerializeField] private InjectionTasks m_CodeInjectionTasks = InjectionTasks.All;
         [SerializeField] private LogLevel m_CodeInjectionLogLevel = LogLevel.Assembly;
         [SerializeField] private List<string> m_CodeInjectionAssemblyWhiteList = new()
         {
             "Assembly-CSharp",
             "VentiCola.UI.Tests"
         };
-
-
-        /// <summary>
-        /// 获取全局的 Model 列表。
-        /// </summary>
-        public List<GlobalModelVar> GlobalModels
-        {
-            get => m_GlobalModels;
-        }
 
         /// <summary>
         /// 获取/设置是否自动执行 Code Injection。
@@ -34,15 +23,6 @@ namespace VentiColaEditor.UI.Settings
         {
             get => m_AutoCodeInjection;
             set => m_AutoCodeInjection = value;
-        }
-
-        /// <summary>
-        /// 获取/设置 Code Injection 的任务。
-        /// </summary>
-        public InjectionTasks CodeInjectionTasks
-        {
-            get => m_CodeInjectionTasks;
-            set => m_CodeInjectionTasks = value;
         }
 
         /// <summary>

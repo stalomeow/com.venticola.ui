@@ -1,3 +1,4 @@
+using Mono.Cecil;
 using Mono.Cecil.Cil;
 using System;
 
@@ -115,6 +116,32 @@ namespace VentiColaEditor.UI.CodeInjection
             else
             {
                 il.Emit_Ldarg(localOrParameter.Index);
+            }
+        }
+
+        public static void Emit_Ldfld_Or_Ldsfld(this ILProcessor il, FieldReference field, bool hasThis)
+        {
+            if (hasThis)
+            {
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldfld, field);
+            }
+            else
+            {
+                il.Emit(OpCodes.Ldsfld, field);
+            }
+        }
+
+        public static void Emit_Ldflda_Or_Ldsflda(this ILProcessor il, FieldReference field, bool hasThis)
+        {
+            if (hasThis)
+            {
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldflda, field);
+            }
+            else
+            {
+                il.Emit(OpCodes.Ldsflda, field);
             }
         }
     }

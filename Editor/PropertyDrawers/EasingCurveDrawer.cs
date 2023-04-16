@@ -1,7 +1,7 @@
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
-using VentiCola.UI.Transitions;
+using VentiCola.UI.Bindings;
 
 namespace VentiColaEditor.UI.PropertyDrawers
 {
@@ -60,7 +60,7 @@ namespace VentiColaEditor.UI.PropertyDrawers
             if (EditorGUI.DropdownButton(dropdownRect, GUIContent.none, FocusType.Keyboard, EditorStyles.popup))
             {
                 var menu = new GenericMenu();
-                var fields = typeof(EasingCurveType).GetFields(BindingFlags.Public | BindingFlags.Static);
+                var fields = typeof(EasingCurveType).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
 
                 foreach (var field in fields)
                 {

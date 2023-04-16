@@ -1,26 +1,23 @@
-using System;
-using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using VentiCola.UI;
-using VentiCola.UI.Factories;
 using VentiColaEditor.UI.Settings;
+using Object = UnityEngine.Object;
 
 namespace VentiColaEditor.UI.CustomEditors
 {
     [CustomEditor(typeof(UIRuntimeSettings))]
     internal class UIRuntimeSettingsEditor : Editor
     {
-        private SerializedProperty m_PageFactoryTypeName;
-        private SerializedProperty m_UIStackMinGrow;
-        private SerializedProperty m_UIStackMaxGrow;
+        private SerializedProperty m_LRUCacheSize;
         private SerializedProperty m_UIRootPrefab;
         private SerializedProperty m_BlurFallbackTexture;
         private SerializedProperty m_Shaders;
-
+        private SerializedProperty m_AdditionalData;
+        private Editor m_AdditionalDataEditor;
 
         private void OnEnable()
         {
@@ -49,7 +46,6 @@ namespace VentiColaEditor.UI.CustomEditors
             }
         }
 
-
         public override void OnInspectorGUI()
         {
             if (UIRuntimeSettings.FindInstance() != target)
@@ -68,13 +64,13 @@ namespace VentiColaEditor.UI.CustomEditors
             DrawGeneralSettings();
 
             EditorGUILayout.Space();
-            DrawUIStackSettings();
-
-            EditorGUILayout.Space();
             DrawPrefabSettings();
 
             EditorGUILayout.Space();
             DrawPlatformSettings();
+
+            EditorGUILayout.Space();
+            DrawAdditionalData();
 
             serializedObject.ApplyModifiedProperties();
         }
@@ -93,83 +89,7 @@ namespace VentiColaEditor.UI.CustomEditors
 
             using (new EditorGUI.IndentLevelScope())
             {
-                Rect rect = EditorGUILayout.GetControlRect();
-                rect = EditorGUI.PrefixLabel(rect, EditorGUIUtility.TrTextContent("Page Factory"));
-
-                string selectedTypeName = m_PageFactoryTypeName.stringValue;
-                Type selectedType = Type.GetType(selectedTypeName, false);
-                GUIContent selectedTypeDisplayName = GetFactoryDisplayName(selectedType);
-
-                if (selectedTypeDisplayName == null)
-                {
-                    // 默认值，需要保证至少有一个 Factory
-                    selectedType = UIRuntimeSettings.DefaultPageFactoryType;
-                    selectedTypeName = selectedType.AssemblyQualifiedName;
-                    selectedTypeDisplayName = GetFactoryDisplayName(selectedType);
-                }
-
-                if (EditorGUI.DropdownButton(rect, selectedTypeDisplayName, FocusType.Keyboard, EditorStyles.popup))
-                {
-                    var menu = new GenericMenu();
-
-                    foreach (Type type in TypeCache.GetTypesDerivedFrom<IAsyncPageFactory>())
-                    {
-                        if (type.IsAbstract || type.IsGenericType)
-                        {
-                            continue;
-                        }
-
-                        GUIContent displayName = GetFactoryDisplayName(type);
-
-                        if (displayName == null)
-                        {
-                            continue;
-                        }
-
-                        ConstructorInfo[] constructors = type.GetConstructors();
-
-                        if (!constructors.Any(ctor => ctor.IsPublic && ctor.GetParameters().Length == 0))
-                        {
-                            continue;
-                        }
-
-                        string typeFullName = type.AssemblyQualifiedName;
-
-                        menu.AddItem(displayName, selectedTypeName == typeFullName, () =>
-                        {
-                            m_PageFactoryTypeName.stringValue = typeFullName;
-                            m_PageFactoryTypeName.serializedObject.ApplyModifiedProperties();
-                        });
-                    }
-
-                    menu.DropDown(rect);
-                }
-            }
-        }
-
-        private static GUIContent GetFactoryDisplayName(Type factoryType)
-        {
-            var attr = factoryType?.GetCustomAttribute<CustomPageFactoryAttribute>();
-
-            if (attr is null || string.IsNullOrWhiteSpace(attr.DisplayName))
-            {
-                return null;
-            }
-
-            return EditorGUIUtility.TrTextContent(attr.DisplayName);
-        }
-
-        private void DrawUIStackSettings()
-        {
-            EditorGUILayout.LabelField("UI Stack", EditorStyles.boldLabel);
-
-            using (new EditorGUI.IndentLevelScope())
-            {
-                EditorGUILayout.PropertyField(m_UIStackMinGrow, EditorGUIUtility.TrTextContent("Min Grow"));
-                m_UIStackMinGrow.intValue = Mathf.Min(m_UIStackMinGrow.intValue, m_UIStackMaxGrow.intValue);
-
-                EditorGUILayout.PropertyField(m_UIStackMaxGrow, EditorGUIUtility.TrTextContent("Max Grow"));
-                m_UIStackMaxGrow.intValue = Mathf.Max(m_UIStackMaxGrow.intValue, m_UIStackMinGrow.intValue);
+                EditorGUILayout.PropertyField(m_LRUCacheSize, EditorGUIUtility.TrTextContent("LRU Cache Size"));
             }
         }
 
@@ -270,6 +190,11 @@ namespace VentiColaEditor.UI.CustomEditors
 
                 while (shaders.NextVisible(true))
                 {
+                    if (!shaders.propertyPath.StartsWith($"{nameof(m_Shaders)}."))
+                    {
+                        break;
+                    }
+
                     EditorGUILayout.PropertyField(shaders);
                 }
             }
@@ -286,6 +211,44 @@ namespace VentiColaEditor.UI.CustomEditors
 
                 //EditorGUILayout.PropertyField(m_BlurFallbackTexture, EditorGUIUtility.TrTextContent("Fallback Texture"));
 
+            }
+        }
+
+        private void DrawAdditionalData()
+        {
+            EditorGUILayout.LabelField("Additional Data", EditorStyles.boldLabel);
+
+            Object targetDataObj;
+            bool hasAdditionalData = true;
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.PropertyField(m_AdditionalData, GUIContent.none);
+                targetDataObj = m_AdditionalData.objectReferenceValue;
+
+                if (targetDataObj == null)
+                {
+                    hasAdditionalData = false;
+                    EditorGUILayout.HelpBox("You can extend the runtime settings by assigning a custom ScriptableObject.", MessageType.Info);
+                }
+            }
+
+            if (hasAdditionalData)
+            {
+                EditorGUILayout.Space();
+                CustomEditorGUIUtils.DrawSplitter();
+                EditorGUILayout.Space();
+
+                if (m_AdditionalDataEditor == null || m_AdditionalDataEditor.target != targetDataObj)
+                {
+                    m_AdditionalDataEditor = CreateEditor(targetDataObj);
+                }
+
+                m_AdditionalDataEditor.OnInspectorGUI();
+            }
+            else
+            {
+                m_AdditionalDataEditor = null;
             }
         }
 

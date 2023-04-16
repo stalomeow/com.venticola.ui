@@ -24,7 +24,14 @@ namespace VentiColaEditor.UI.CodeInjection
                     continue;
                 }
 
-                string directory = Path.GetDirectoryName(assembly.Location);
+                string location = assembly.Location;
+
+                if (string.IsNullOrWhiteSpace(location))
+                {
+                    continue;
+                }
+
+                string directory = Path.GetDirectoryName(location);
 
                 if (directorys.Add(directory))
                 {

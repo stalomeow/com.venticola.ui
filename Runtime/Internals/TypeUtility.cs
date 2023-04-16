@@ -3,7 +3,7 @@ using System.Text;
 
 namespace VentiCola.UI.Internals
 {
-    public static class TypeUtility
+    internal static class TypeUtility
     {
         [ThreadStatic] private static StringBuilder s_StrBuilder;
 

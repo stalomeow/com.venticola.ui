@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.Compilation;
 using UnityEditorInternal;
@@ -17,13 +16,10 @@ namespace VentiColaEditor.UI.Settings
     internal class UIProjectSettingsProvider : SettingsProvider
     {
         private SerializedObject m_SerializedObject;
-        private SerializedProperty m_GlobalModels;
         private SerializedProperty m_AutoCodeInjection;
-        private SerializedProperty m_CodeInjectionTasks;
         private SerializedProperty m_CodeInjectionLogLevel;
         private SerializedProperty m_CodeInjectionAssemblyWhiteList;
 
-        private ReorderableList m_GlobalModelsList;
         private ReorderableList m_CIAssemblyWhiteList; // for m_CodeInjectionAssemblyWhiteList
 
         public UIProjectSettingsProvider(string path, SettingsScope scopes, IEnumerable<string> keywords = null) : base(path, scopes, keywords)
@@ -56,7 +52,7 @@ namespace VentiColaEditor.UI.Settings
             m_SerializedObject.Update();
             EditorGUI.BeginChangeCheck();
 
-            using (EditorGUIUtils.NewSettingsWindowGUIScope())
+            using (CustomEditorGUIUtils.NewSettingsWindowGUIScope())
             {
                 EditorGUILayout.LabelField("Runtime Settings", EditorStyles.boldLabel);
 
@@ -72,13 +68,7 @@ namespace VentiColaEditor.UI.Settings
 
                 EditorGUILayout.Space();
 
-                EditorGUILayout.LabelField("Environment", EditorStyles.boldLabel);
-                DrawGlobalModelsField();
-
-                EditorGUILayout.Space();
-
                 EditorGUILayout.LabelField("Code Injection", EditorStyles.boldLabel);
-                DrawCodeInjectionTasksField();
                 DrawCodeInjectionLogLevelField();
                 DrawEditorOptionsFields();
                 EditorGUILayout.Space(1);
@@ -157,78 +147,6 @@ namespace VentiColaEditor.UI.Settings
             FocusOnObject(settings);
         }
 
-        private void DrawGlobalModelsField()
-        {
-            m_GlobalModelsList ??= new ReorderableList(m_SerializedObject, m_GlobalModels, false, false, true, true)
-            {
-                multiSelect = false,
-                elementHeight = EditorGUIUtility.singleLineHeight,
-                drawNoneElementCallback = (Rect rect) =>
-                {
-                    EditorGUI.LabelField(rect, "No Definition Found");
-                },
-                drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
-                {
-                    var prop = m_GlobalModels.GetArrayElementAtIndex(index);
-                    var name = prop.FindPropertyRelative(nameof(GlobalModelVar.Name));
-                    var typeName = prop.FindPropertyRelative(nameof(GlobalModelVar.TypeAssemblyQualifiedName));
-                    var type = Type.GetType(typeName.stringValue);
-
-                    rect.height = EditorGUIUtility.singleLineHeight;
-                    name.stringValue = EditorGUI.TextField(rect, $"Model Definition {index}", name.stringValue);
-
-                    GUIStyle style = new GUIStyle(EditorStyles.label)
-                    {
-                        alignment = TextAnchor.MiddleRight,
-                        richText = true
-                    };
-                    EditorGUI.LabelField(rect, $"<color=#888888> ({type.Name}) </color>", style);
-                },
-                onAddDropdownCallback = (Rect buttonRect, ReorderableList list) =>
-                {
-                    IEnumerable<Type> types = (
-                        from type in TypeCache.GetTypesDerivedFrom<ReactiveModel>()
-                        where !type.IsGenericType // the types of properties in generic types may be undetermined.
-                        select type
-                    );
-
-                    var menu = new GenericMenu();
-
-                    foreach (Type type in types)
-                    {
-                        string itemName = new Regex(@"[\.\+]").Replace(type.FullName, "/");
-                        menu.AddItem(new GUIContent(itemName), false, obj =>
-                        {
-                            var array = list.serializedProperty;
-                            array.InsertArrayElementAtIndex(array.arraySize);
-
-                            var prop = array.GetArrayElementAtIndex(array.arraySize - 1);
-                            var name = prop.FindPropertyRelative(nameof(GlobalModelVar.Name));
-                            var type = prop.FindPropertyRelative(nameof(GlobalModelVar.TypeAssemblyQualifiedName));
-                            name.stringValue = (obj as Type).Name;
-                            type.stringValue = (obj as Type).AssemblyQualifiedName;
-
-                            array.serializedObject.ApplyModifiedProperties();
-                            GUI.changed = true;
-                        }, type);
-                    }
-
-                    menu.DropDown(buttonRect);
-                }
-            };
-
-            m_GlobalModels.isExpanded = EditorGUILayout.BeginFoldoutHeaderGroup(
-                m_GlobalModels.isExpanded, "Global Model Definition");
-
-            if (m_GlobalModels.isExpanded)
-            {
-                Rect rect = EditorGUILayout.GetControlRect(false, m_GlobalModelsList.GetHeight());
-                m_GlobalModelsList.DoList(EditorGUI.IndentedRect(rect));
-            }
-
-            EditorGUILayout.EndFoldoutHeaderGroup();
-        }
-
         private void DrawEditorOptionsFields()
         {
             EditorGUILayout.LabelField("Editor Options");
@@ -239,13 +157,6 @@ namespace VentiColaEditor.UI.Settings
                 var newValue = EditorGUILayout.Toggle("Execute After Compilation", oldValue);
                 m_AutoCodeInjection.boolValue = newValue;
             }
-        }
-
-        private void DrawCodeInjectionTasksField()
-        {
-            var oldTasks = (InjectionTasks)m_CodeInjectionTasks.intValue;
-            var newTasks = (InjectionTasks)EditorGUILayout.EnumFlagsField("Tasks", oldTasks);
-            m_CodeInjectionTasks.intValue = (int)newTasks;
         }
 
         private void DrawCodeInjectionLogLevelField()

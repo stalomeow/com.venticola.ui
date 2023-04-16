@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using UnityEngine;
-using VentiCola.UI.Factories;
 
 #if UNITY_EDITOR
 using System.Reflection;
@@ -10,10 +9,10 @@ using UnityEditor;
 
 namespace VentiCola.UI
 {
-    internal class UIRuntimeSettings : ScriptableObject
+    public class UIRuntimeSettings : ScriptableObject
     {
         [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
-        private class DefaultShaderAttribute : Attribute
+        private sealed class DefaultShaderAttribute : Attribute
         {
             public string AssetPath { get; }
 
@@ -41,52 +40,23 @@ namespace VentiCola.UI
 
         private const string k_ConfigName = "com.stalo.venticola.ui";
 
-        public static Type DefaultPageFactoryType => typeof(ResourcesPageFactory);
-
-        [SerializeField] private string m_PageFactoryTypeName;
-        [SerializeField, Min(1)] private int m_UIStackMinGrow = 5;
-        [SerializeField, Min(1)] private int m_UIStackMaxGrow = 10;
+        [SerializeField, Min(3)] private int m_LRUCacheSize = 5;
         [SerializeField] private GameObject m_UIRootPrefab;
         [SerializeField] private Texture2D m_BlurFallbackTexture;
         [SerializeField] private ShaderResources m_Shaders;
+        [SerializeField] private ScriptableObject m_AdditionalData;
 
-        public string PageFactoryTypeName
+        public int LRUCacheSize => m_LRUCacheSize;
+
+        public GameObject UIRootPrefab => m_UIRootPrefab;
+
+        public Texture2D BlurFallbackTexture => m_BlurFallbackTexture;
+
+        public ShaderResources DefaultShaders => m_Shaders;
+
+        public T GetAdditionalData<T>() where T : ScriptableObject
         {
-            get
-            {
-                // 需要保证至少有一个 Factory
-                if (string.IsNullOrWhiteSpace(m_PageFactoryTypeName))
-                {
-                    return DefaultPageFactoryType.AssemblyQualifiedName;
-                }
-
-                return m_PageFactoryTypeName;
-            }
-        }
-
-        public int UIStackMinGrow
-        {
-            get => m_UIStackMinGrow;
-        }
-
-        public int UIStackMaxGrow
-        {
-            get => m_UIStackMaxGrow;
-        }
-
-        public GameObject UIRootPrefab
-        {
-            get => m_UIRootPrefab;
-        }
-
-        public Texture2D BlurFallbackTexture
-        {
-            get => m_BlurFallbackTexture;
-        }
-
-        public ShaderResources Shaders
-        {
-            get => m_Shaders;
+            return m_AdditionalData as T;
         }
 
 #if UNITY_EDITOR
@@ -110,7 +80,7 @@ namespace VentiCola.UI
         }
 #endif
 
-        public static UIRuntimeSettings FindInstance()
+        internal static UIRuntimeSettings FindInstance()
         {
 #if UNITY_EDITOR
             if (EditorBuildSettings.TryGetConfigObject(k_ConfigName, out UIRuntimeSettings settings))
@@ -124,8 +94,7 @@ namespace VentiCola.UI
 
             if (settings.Length == 0)
             {
-                UnityEngine.Debug.LogError($"No {typeof(UIRuntimeSettings)} was found!");
-                return null;
+                throw new MissingReferenceException($"Can not find {typeof(UIRuntimeSettings)}!");
             }
 
             if (settings.Length > 1)
@@ -138,7 +107,7 @@ namespace VentiCola.UI
         }
 
         [Conditional("UNITY_EDITOR")]
-        public static void SetInstance(UIRuntimeSettings settings)
+        internal static void SetInstance(UIRuntimeSettings settings)
         {
             if (settings == null)
             {

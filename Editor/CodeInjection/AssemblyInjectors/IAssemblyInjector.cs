@@ -11,8 +11,6 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
 
         MethodReferenceCache Methods { get; set; }
 
-        InjectionTasks Tasks { get; set; }
-
         LogLevel LogLevel { get; set; }
 
         IProgress<float> Progress { get; set; }

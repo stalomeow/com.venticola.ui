@@ -1,96 +1,90 @@
-using System;
 using System.Collections.Generic;
-using System.Threading;
 using UnityEngine;
 
 namespace VentiCola.UI.Internals
 {
     public static class ChangeUtility
     {
-        [ThreadStatic] private static Stack<IChangeObserver> s_Observers;
-        private static volatile int s_DisableNotification;
+        private static readonly Stack<IChangeObserver> s_ObserverStack = new();
+        private static int s_DisableNotification = 0;
 
         /// <summary>
         /// 获取当前的观察者。如果没有，则返回 null。
         /// </summary>
-        public static IChangeObserver CurrentObserver
-        {
-            get
-            {
-                if (s_Observers is null or { Count: 0 })
-                {
-                    return null;
-                }
+        public static IChangeObserver CurrentObserver => s_ObserverStack.TryPeek(out var ob) ? ob : null;
 
-                return s_Observers.Peek();
+        public static void TryAddCurrentObserver(ref WeakHashSet<IChangeObserver> observers)
+        {
+            IChangeObserver observer = CurrentObserver;
+
+            if (observer is { IsPassive: false })
+            {
+                observers ??= new WeakHashSet<IChangeObserver>();
+                observer.Plugin.AddSelfToHashSet(observer, observers);
             }
+        }
+
+        public static void SetWithNotify<T>(ref T location, T value, WeakHashSet<IChangeObserver> observers)
+        {
+            if (EqualityComparer<T>.Default.Equals(location, value))
+            {
+                return;
+            }
+
+            location = value;
+            TryNotify(observers);
         }
 
         public static void BeginObservedRegion(IChangeObserver observer)
         {
-            s_Observers ??= new Stack<IChangeObserver>();
-            s_Observers.Push(observer);
+            s_ObserverStack.Push(observer);
+            observer.Plugin.IncreaseStackCount();
         }
 
         public static void EndObservedRegion(IChangeObserver observer)
         {
-            bool broken = false;
+            bool popped = s_ObserverStack.TryPop(out IChangeObserver topObserver);
 
-            if (s_Observers is null or { Count: 0 })
-            {
-                broken = true;
-            }
-            else
-            {
-                IChangeObserver ob = s_Observers.Pop();
-
-                if (!ReferenceEquals(observer, ob))
-                {
-                    broken = true;
-                }
-            }
-
-            if (broken)
+            if (!popped || !ReferenceEquals(observer, topObserver))
             {
                 Debug.LogError("Observer Stack is broken!");
+                return;
             }
+
+            observer.Plugin.DecreaseStackCount(observer);
         }
 
         public static void BeginNoNotifyRegion()
         {
-            Interlocked.Increment(ref s_DisableNotification);
+            s_DisableNotification++;
         }
 
         public static void EndNoNotifyRegion()
         {
-            Interlocked.Decrement(ref s_DisableNotification);
+            s_DisableNotification--;
         }
 
-        public static void NotifyObservers(UnityWeakHashSet<IChangeObserver> observers)
+        /// <summary>
+        /// 通知所有观察者
+        /// </summary>
+        /// <param name="observers">该值可以为 null</param>
+        public static void TryNotify(WeakHashSet<IChangeObserver> observers)
         {
-            if (s_DisableNotification > 0)
+            if (observers is null || s_DisableNotification > 0)
             {
                 return;
             }
 
             var currentOb = CurrentObserver;
-            var it = observers.GetEnumerator();
 
-            try
+            foreach (IChangeObserver observer in observers)
             {
-                while (it.MoveNext())
+                if (ReferenceEquals(observer, currentOb))
                 {
-                    IChangeObserver observer = it.Current;
-
-                    if (!ReferenceEquals(observer, currentOb))
-                    {
-                        observer.NotifyChanged();
-                    }
+                    continue;
                 }
-            }
-            finally
-            {
-                it.Dispose();
+
+                observer.NotifyChanged();
             }
         }
     }

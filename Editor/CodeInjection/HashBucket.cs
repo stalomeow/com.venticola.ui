@@ -2,7 +2,7 @@ using Mono.Cecil.Cil;
 
 namespace VentiColaEditor.UI.CodeInjection
 {
-    internal struct HashBucket<T>
+    internal readonly struct HashBucket<T>
     {
         public T[] Entries { get; }
 

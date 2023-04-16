@@ -30,14 +30,9 @@ namespace VentiColaEditor.UI.CodeInjection
         [InspectorName("Property")]
         Property = 1 << 2,
         /// <summary>
-        /// 输出方法信息。
-        /// </summary>
-        [InspectorName("Method")]
-        Method = 1 << 3,
-        /// <summary>
         /// 输出所有信息。
         /// </summary>
         [InspectorName("Everything")]
-        All = Assembly | Type | Property | Method
+        All = Assembly | Type | Property
     }
 }

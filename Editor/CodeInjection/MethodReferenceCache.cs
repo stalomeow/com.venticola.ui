@@ -1,10 +1,6 @@
 using Mono.Cecil;
-using System;
-using System.Linq;
 using System.Reflection;
-using UnityEngine;
 using VentiCola.UI;
-using VentiCola.UI.Bindings;
 using VentiCola.UI.Internals;
 
 namespace VentiColaEditor.UI.CodeInjection
@@ -14,17 +10,10 @@ namespace VentiColaEditor.UI.CodeInjection
         private readonly ModuleDefinition m_Module;
         private MethodReference m_StringHashMethod;
         private MethodReference m_StringEqualityOperator;
-        private MethodReference m_MissingPublicPropertyExceptionConstructor;
-        private MethodReference m_MissingPublicMethodExceptionConstructor;
         private MethodReference m_CastValueTypeMethod;
         private MethodReference m_CastAnyMethod;
-        private MethodReference m_DataModelGetMethod;
-        private MethodReference m_DataModelSetMethod;
-        private MethodReference m_DataModelGetPropertyMethod;
-        private MethodReference m_DataModelSetPropertyMethod;
-        private MethodReference m_DynamicArgumentGetValueMethod;
-        private MethodReference m_UIPageVoidInvokeMethod;
-        private MethodReference m_UIPageTInvokeMethod;
+        private MethodReference m_ChangeUtilityTryAddCurrentObserverMethod;
+        private MethodReference m_ChangeUtilitySetWithNotifyMethod;
 
         public MethodReferenceCache(ModuleDefinition module)
         {
@@ -64,31 +53,18 @@ namespace VentiColaEditor.UI.CodeInjection
             }
         }
 
-        public MethodReference MissingPublicPropertyExceptionConstructor
+        public MethodReference ChangeUtilityTryAddCurrentObserverMethod
         {
             get
             {
-                if (m_MissingPublicPropertyExceptionConstructor is null)
+                if (m_ChangeUtilityTryAddCurrentObserverMethod is null)
                 {
-                    var ctor = typeof(MissingPublicPropertyException).GetConstructor(new Type[] { typeof(string) });
-                    m_MissingPublicPropertyExceptionConstructor = m_Module.ImportReference(ctor);
+                    const BindingFlags flags = BindingFlags.Public | BindingFlags.Static;
+                    var method = typeof(ChangeUtility).GetMethod(nameof(ChangeUtility.TryAddCurrentObserver), flags);
+                    m_ChangeUtilityTryAddCurrentObserverMethod = m_Module.ImportReference(method);
                 }
 
-                return m_MissingPublicPropertyExceptionConstructor;
-            }
-        }
-
-        public MethodReference MissingPublicMethodExceptionConstructor
-        {
-            get
-            {
-                if (m_MissingPublicMethodExceptionConstructor is null)
-                {
-                    var ctor = typeof(MissingPublicMethodException).GetConstructor(new Type[] { typeof(string) });
-                    m_MissingPublicMethodExceptionConstructor = m_Module.ImportReference(ctor);
-                }
-
-                return m_MissingPublicMethodExceptionConstructor;
+                return m_ChangeUtilityTryAddCurrentObserverMethod;
             }
         }
 
@@ -116,133 +92,44 @@ namespace VentiColaEditor.UI.CodeInjection
             return MakeGenericMethod(m_CastAnyMethod, genericArguments);
         }
 
-        public GenericInstanceMethod MakeDataModelGetMethod(params TypeReference[] genericArguments)
+        public GenericInstanceMethod MakeChangeUtilitySetWithNotifyMethod(params TypeReference[] genericArguments)
         {
-            if (m_DataModelGetMethod is null)
+            if (m_ChangeUtilitySetWithNotifyMethod is null)
             {
-                const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-                var method = typeof(ReactiveModel).GetMethod(nameof(ReactiveModel.Get), flags);
-                m_DataModelGetMethod = m_Module.ImportReference(method);
+                const BindingFlags flags = BindingFlags.Public | BindingFlags.Static;
+                var method = typeof(ChangeUtility).GetMethod(nameof(ChangeUtility.SetWithNotify), flags);
+                m_ChangeUtilitySetWithNotifyMethod = m_Module.ImportReference(method);
             }
 
-            return MakeGenericMethod(m_DataModelGetMethod, genericArguments);
+            return MakeGenericMethod(m_ChangeUtilitySetWithNotifyMethod, genericArguments);
         }
 
-        public GenericInstanceMethod MakeDataModelSetMethod(params TypeReference[] genericArguments)
+        public MethodReference MakeFuncDelegateConstructor(TypeReference genericTypeArgument)
         {
-            if (m_DataModelSetMethod is null)
-            {
-                const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-                var method = typeof(ReactiveModel).GetMethod(nameof(ReactiveModel.Set), flags);
-                m_DataModelSetMethod = m_Module.ImportReference(method);
-            }
-
-            return MakeGenericMethod(m_DataModelSetMethod, genericArguments);
-        }
-
-        public GenericInstanceMethod MakeDataModelGetPropertyMethod(params TypeReference[] genericArguments)
-        {
-            if (m_DataModelGetPropertyMethod is null)
-            {
-                const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-                var method = typeof(ReactiveModel).GetMethod("GetProperty", flags);
-                m_DataModelGetPropertyMethod = m_Module.ImportReference(method);
-            }
-
-            return MakeGenericMethod(m_DataModelGetPropertyMethod, genericArguments);
-        }
-
-        public GenericInstanceMethod MakeDataModelSetPropertyMethod(params TypeReference[] genericArguments)
-        {
-            if (m_DataModelSetPropertyMethod is null)
-            {
-                const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-                var method = typeof(ReactiveModel).GetMethod("SetProperty", 1, flags, null, new Type[]
-                {
-                    Type.MakeGenericMethodParameter(0).MakeByRefType(),
-                    Type.MakeGenericMethodParameter(0),
-                    typeof(string)
-                }, null);
-                m_DataModelSetPropertyMethod = m_Module.ImportReference(method);
-            }
-
-            return MakeGenericMethod(m_DataModelSetPropertyMethod, genericArguments);
-        }
-
-        public GenericInstanceMethod MakeDynamicArgumentGetValueMethod(params TypeReference[] genericArguments)
-        {
-            if (m_DynamicArgumentGetValueMethod is null)
-            {
-                const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-                var method = typeof(DynamicArgument).GetMethod(nameof(DynamicArgument.GetValue), flags);
-                m_DynamicArgumentGetValueMethod = m_Module.ImportReference(method);
-            }
-
-            return MakeGenericMethod(m_DynamicArgumentGetValueMethod, genericArguments);
-        }
-
-        public GenericInstanceMethod MakeUIPageVoidInvokeMethod(params TypeReference[] genericArguments)
-        {
-            if (m_UIPageVoidInvokeMethod is null)
-            {
-                const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-                var method = typeof(UIPage).GetMethod(nameof(UIPage.InvokeMethod), 1, flags, null, new Type[]
-                {
-                    typeof(string),
-                    typeof(Transform),
-                    Type.MakeGenericMethodParameter(0),
-                    typeof(DynamicArgument[])
-                }, null);
-                m_UIPageVoidInvokeMethod = m_Module.ImportReference(method);
-            }
-
-            return MakeGenericMethod(m_UIPageVoidInvokeMethod, genericArguments);
-        }
-
-        public GenericInstanceMethod MakeUIPageTInvokeMethod(params TypeReference[] genericArguments)
-        {
-            if (m_UIPageTInvokeMethod is null)
-            {
-                const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
-                var method = typeof(UIPage).GetMethod(nameof(UIPage.InvokeMethod), 1, flags, null, new Type[]
-                {
-                    typeof(string),
-                    typeof(Transform),
-                    typeof(DynamicArgument[])
-                }, null);
-                m_UIPageTInvokeMethod = m_Module.ImportReference(method);
-            }
-
-            return MakeGenericMethod(m_UIPageTInvokeMethod, genericArguments);
-        }
-
-        public MethodReference MakeFuncDelegateConstructor(ModuleDefinition module, TypeReference genericTypeArgument)
-        {
-            var funcType = new GenericInstanceType(new TypeReference("System", "Func`1", module,
-                module.TypeSystem.CoreLibrary, false));
+            var funcType = new GenericInstanceType(new TypeReference("System", "Func`1", m_Module,
+                m_Module.TypeSystem.CoreLibrary, false));
             funcType.GenericArguments.Add(genericTypeArgument);
 
-            return new MethodReference(".ctor", module.TypeSystem.Void, funcType)
+            return new MethodReference(".ctor", m_Module.TypeSystem.Void, funcType)
             {
                 HasThis = true,
-                Parameters = { new(module.TypeSystem.Object), new(module.TypeSystem.IntPtr) }
+                Parameters = { new(m_Module.TypeSystem.Object), new(m_Module.TypeSystem.IntPtr) }
             };
         }
 
-        public MethodReference MakeLazyComputedPropertyCtor2Args(ModuleDefinition module, TypeReference declaringType)
+        public MethodReference MakeLazyComputedPropertyCtor(TypeReference declaringType)
         {
-            MethodReference computedCtor = module.ImportReference(typeof(LazyComputedProperty<>)
-                .GetConstructors().First(ctor => ctor.GetParameters().Length == 2));
+            MethodReference computedCtor = m_Module.ImportReference(typeof(LazyComputedProperty<>).GetConstructors()[0]);
             computedCtor.DeclaringType = declaringType;
             return computedCtor;
         }
 
-        public MethodReference MakeLazyComputedPropertyValueGetter(ModuleDefinition module, TypeReference declaringType)
+        public MethodReference MakeLazyComputedPropertyValueGetter(TypeReference declaringType)
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
             var method = typeof(LazyComputedProperty<>).GetProperty("Value", flags).GetGetMethod(false);
 
-            MethodReference result = module.ImportReference(method);
+            MethodReference result = m_Module.ImportReference(method);
             result.DeclaringType = declaringType;
             return result;
         }

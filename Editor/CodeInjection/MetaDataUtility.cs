@@ -8,10 +8,10 @@ namespace VentiColaEditor.UI.CodeInjection
 {
     internal static class MetaDataUtility
     {
-        public static List<TypeDefinition> FindAllTypes(AssemblyDefinition assembly, Func<TypeDefinition, bool> predicate)
+        public static void ForEachAllTypes(AssemblyDefinition assembly, Action<int, int, TypeDefinition> action)
         {
-            var results = new List<TypeDefinition>();
             var queue = new Queue<TypeDefinition>();
+            var allTypes = new List<TypeDefinition>();
 
             // find types including nested types
             foreach (TypeDefinition topLevelType in assembly.MainModule.Types)
@@ -20,10 +20,7 @@ namespace VentiColaEditor.UI.CodeInjection
 
                 while (queue.TryDequeue(out TypeDefinition type))
                 {
-                    if (predicate(type))
-                    {
-                        results.Add(type);
-                    }
+                    allTypes.Add(type);
 
                     if (type.HasNestedTypes)
                     {
@@ -35,13 +32,23 @@ namespace VentiColaEditor.UI.CodeInjection
                 }
             }
 
-            return results;
+            for (int i = 0; i < allTypes.Count; i++)
+            {
+                action(i, allTypes.Count, allTypes[i]);
+            }
         }
 
-        public static GenericInstanceType ImportGenericTypeReference(ModuleDefinition module, Type genericTypeDefinition, params TypeReference[] typeArguments)
+        public static TypeReference ImportTypeReference(ModuleDefinition module, Type type, params TypeReference[] typeArguments)
         {
-            var typeDefinition = module.ImportReference(genericTypeDefinition);
-            var instanceType = new GenericInstanceType(typeDefinition);
+            var importedType = module.ImportReference(type);
+
+            if (typeArguments.Length == 0)
+            {
+                return importedType;
+            }
+
+            // 泛型
+            var instanceType = new GenericInstanceType(importedType);
 
             for (int i = 0; i < typeArguments.Length; i++)
             {

@@ -1,6 +1,6 @@
 {
   "name": "com.venticola.ui",
-  "version": "0.4.7-preview",
+  "version": "0.5.1-preview",
   "displayName": "VentiCola UI",
   "description": "A MVVM UI framework mainly inspired by vue.",
   "unity": "2021.3",
