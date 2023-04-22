@@ -4,11 +4,14 @@ using Mono.Collections.Generic;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using UnityEngine;
-using VentiCola.UI;
-using VentiCola.UI.Internals;
+using VentiCola.UI.Bindings;
+using VentiCola.UI.Internal;
 using static VentiColaEditor.UI.CodeInjection.MetaDataUtility;
+using FieldAttributes = Mono.Cecil.FieldAttributes;
+using MethodAttributes = Mono.Cecil.MethodAttributes;
 
 namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
 {
@@ -21,38 +24,34 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
             public MethodDefinition Getter;
         }
 
-        public string DisplayTitle => "Reactive Injector";
+        private class ReactiveAttributeData
+        {
+            public bool LazyComputed { get; set; }
+
+            public TypeReference EqualityComparer { get; set; }
+        }
 
         public AssemblyDefinition Assembly { get; set; }
 
         public MethodReferenceCache Methods { get; set; }
 
-        public LogLevel LogLevel { get; set; }
+        public Action<float> ProgressCallback { get; set; }
 
-        public IProgress<float> Progress { get; set; }
-
-        public bool InjectAssembly()
+        public bool Execute()
         {
             var injectedAnyCode = false;
             var computedPropsBuffer = new List<ComputedPropInfo>();
 
-            ForEachAllTypes(Assembly, (i, count, type) =>
+            ForEachAllTypesIncludeNested(Assembly, (i, count, type) =>
             {
-                Progress.Report((float)(i + 1) / count);
+                ProgressCallback((float)(i + 1) / count);
 
                 if (type.IsValueType || type.IsInterface)
                 {
                     return;
                 }
 
-                bool injectedAnyProps = InjectProperties(type, computedPropsBuffer);
-                injectedAnyCode |= injectedAnyProps;
-                computedPropsBuffer.Clear();
-
-                if (injectedAnyProps && LogLevel.HasFlag(LogLevel.Type))
-                {
-                    Debug.Log($"Injected UI codes for type <b>'{type.FullName}'</b>.");
-                }
+                injectedAnyCode |= InjectProperties(type, computedPropsBuffer);
             });
 
             return injectedAnyCode;
@@ -64,12 +63,12 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
 
             foreach (PropertyDefinition prop in type.Properties)
             {
-                if (!IsReactiveProperty(prop, out bool isComputed))
+                if (!IsReactiveProperty(prop, out ReactiveAttributeData attr))
                 {
                     continue;
                 }
 
-                if (isComputed)
+                if (attr.LazyComputed)
                 {
                     InjectComputedPropertyBackingField(prop, out FieldDefinition field);
                     InjectComputedPropertyAnonymousMethod(prop, out MethodDefinition method);
@@ -81,56 +80,71 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
                         BackingField = field,
                         Getter = method
                     });
-
-                    if (LogLevel.HasFlag(LogLevel.Property))
-                    {
-                        Debug.Log($"Injected UI codes for lazy-computed-property <b>'{prop.FullName}'</b>.");
-                    }
                 }
                 else
                 {
                     InjectAutoPropertyObserversField(prop, out FieldDefinition observersField);
+                    InjectAutoPropertyComparerField(prop, attr.EqualityComparer, out FieldDefinition comparerField);
                     InjectAutoPropertyGetter(prop, observersField);
-                    InjectAutoPropertySetter(prop, observersField);
-
-                    if (LogLevel.HasFlag(LogLevel.Property))
-                    {
-                        Debug.Log($"Injected UI codes for auto-property <b>'{prop.FullName}'</b>.");
-                    }
+                    InjectAutoPropertySetter(prop, observersField, comparerField);
                 }
 
                 injectedAnyCode = true;
             }
 
             InjectComputedPropertyInitializations(type, computedPropsBuffer);
+            computedPropsBuffer.Clear();
             return injectedAnyCode;
         }
 
-        private static bool IsReactiveProperty(PropertyDefinition prop, out bool isComputed)
+        private static bool IsReactiveProperty(PropertyDefinition prop, out ReactiveAttributeData attr)
         {
-            if (!HasCustomAttribute<ReactiveAttribute>(prop.CustomAttributes, out CustomAttribute attr))
+            if (!HasCustomAttribute<ReactiveAttribute>(prop.CustomAttributes, out CustomAttribute customAttr))
             {
-                isComputed = false;
+                attr = null;
                 return false;
             }
 
-            isComputed = (attr.HasProperties && (bool)attr.Properties[0].Argument.Value);
+            attr = new ReactiveAttributeData();
 
-            if (isComputed)
+            for (int i = 0; i < customAttr.Properties.Count; i++)
+            {
+                var propArg = customAttr.Properties[i];
+                var propInfo = attr.GetType().GetProperty(propArg.Name, BindingFlags.Public | BindingFlags.Instance);
+                propInfo.SetValue(attr, propArg.Argument.Value);
+            }
+
+            if (attr.LazyComputed)
             {
                 // 只对 getter 作要求
-                return prop.GetMethod is not null
+                bool validComputed = prop.GetMethod is not null
                     && prop.GetMethod.HasBody
                     && !IsCompilerGeneratedMethod(prop.GetMethod);
+
+                if (!validComputed)
+                {
+                    attr = null;
+                    Debug.LogWarningFormat("Property '{0}' should be a manually implemented property with at least a getter having body.", prop.FullName);
+                }
+
+                return validComputed;
             }
 
             // 必须是自动实现 get & set 属性
-            return prop.GetMethod is not null
+            bool valid = prop.GetMethod is not null
                 && prop.GetMethod.HasBody
                 && IsCompilerGeneratedMethod(prop.GetMethod)
                 && prop.SetMethod is not null
                 && prop.SetMethod.HasBody
                 && IsCompilerGeneratedMethod(prop.SetMethod);
+
+            if (!valid)
+            {
+                attr = null;
+                Debug.LogWarningFormat("Property '{0}' should be an auto-implemented property with both a getter and a setter.", prop.FullName);
+            }
+
+            return valid;
         }
 
         private static void InjectAutoPropertyObserversField(PropertyDefinition prop, out FieldDefinition field)
@@ -149,6 +163,30 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
             prop.DeclaringType.Fields.Add(field);
         }
 
+        private static void InjectAutoPropertyComparerField(PropertyDefinition prop, TypeReference comparerType, out FieldDefinition field)
+        {
+            if (comparerType == null)
+            {
+                field = null;
+                return;
+            }
+
+            // 因为 comparerType 是从 Attribute 参数里来的，所以此处不知道它是不是 ValueType
+            // 换言之，即使 comparerType 是 ValueType，依然有 comparerType.IsValueType === false
+
+            var fieldName = $"<{prop.Name}>k__EqComparer";
+            var fieldAttr = FieldAttributes.Private;
+
+            if (!prop.HasThis)
+            {
+                fieldAttr |= FieldAttributes.Static;
+            }
+
+            field = new FieldDefinition(fieldName, fieldAttr, comparerType);
+            AddCompilerGeneratedAttribute(prop.Module, field.CustomAttributes);
+            prop.DeclaringType.Fields.Add(field);
+        }
+
         private void InjectAutoPropertyGetter(PropertyDefinition prop, FieldReference observersField)
         {
             MethodDefinition getter = prop.GetMethod;
@@ -157,7 +195,7 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
 
             if (backingField is null)
             {
-                throw new MissingFieldException($"Can not find the backing-field of auto-property '{prop.FullName}'!");
+                throw new MissingFieldException($"Can not find the backing-field of auto-implemented property '{prop.FullName}'!");
             }
 
             RemoveCustomAttributes(getter.CustomAttributes, typeof(CompilerGeneratedAttribute));
@@ -172,7 +210,7 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
             il.Emit(OpCodes.Ret);
         }
 
-        private void InjectAutoPropertySetter(PropertyDefinition prop, FieldReference observersField)
+        private void InjectAutoPropertySetter(PropertyDefinition prop, FieldReference observersField, FieldReference comparerField)
         {
             MethodDefinition setter = prop.SetMethod;
             Collection<Instruction> instructions = setter.Body.Instructions;
@@ -180,7 +218,7 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
 
             if (backingField is null)
             {
-                throw new MissingFieldException($"Can not find the backing-field of auto-property '{prop.FullName}'!");
+                throw new MissingFieldException($"Can not find the backing-field of auto-implemented property '{prop.FullName}'!");
             }
 
             RemoveCustomAttributes(setter.CustomAttributes, typeof(CompilerGeneratedAttribute));
@@ -191,7 +229,17 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
             il.Emit_Ldflda_Or_Ldsflda(backingField, prop.HasThis);
             il.Emit(prop.HasThis ? OpCodes.Ldarg_1 : OpCodes.Ldarg_0);
             il.Emit_Ldfld_Or_Ldsfld(observersField, prop.HasThis);
-            il.Emit(OpCodes.Call, Methods.MakeChangeUtilitySetWithNotifyMethod(prop.PropertyType));
+
+            if (comparerField is not null)
+            {
+                il.Emit_Ldflda_Or_Ldsflda(comparerField, prop.HasThis);
+                il.Emit(OpCodes.Call, Methods.MakeChangeUtilitySetWithNotifyMethodWithRefComparer(prop.PropertyType, comparerField.FieldType));
+            }
+            else
+            {
+                il.Emit(OpCodes.Call, Methods.MakeChangeUtilitySetWithNotifyMethod(prop.PropertyType));
+            }
+
             il.Emit(OpCodes.Ret);
         }
 
@@ -265,6 +313,25 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
 
         private void InjectComputedPropertyInitializations(TypeDefinition type, List<ComputedPropInfo> computedProps)
         {
+            if (computedProps.Any(c => !c.Prop.HasThis))
+            {
+                // Note: .ctor() 至少有一个，但 .cctor() 可能没有
+                if (!type.Methods.Any(m => m.IsConstructor && m.IsStatic))
+                {
+                    var cctor = new MethodDefinition(".cctor",
+                        MethodAttributes.Private      |
+                        MethodAttributes.Static       |
+                        MethodAttributes.HideBySig    |
+                        MethodAttributes.SpecialName  |
+                        MethodAttributes.RTSpecialName,
+                        type.Module.TypeSystem.Void);
+                    cctor.Body.Instructions.Add(Instruction.Create(OpCodes.Ret));
+
+                    // 添加一个 .cctor()
+                    type.Methods.Add(cctor);
+                }
+            }
+
             var prependInstructions = new List<Instruction>();
 
             foreach (MethodDefinition method in type.Methods)
@@ -274,11 +341,9 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
                     continue;
                 }
 
-                // '.cctor' or '.ctor'
-                bool hasThis = (method.Name == ".ctor");
                 Collection<Instruction> instructions = method.Body.Instructions;
 
-                if (hasThis && InstructionsWillInvokeOwnInstanceConstructor(type, instructions))
+                if (method.HasThis && InstructionsWillInvokeOwnInstanceConstructor(type, instructions))
                 {
                     continue; // 避免多次调用构造方法，重复初始化字段
                 }
@@ -287,32 +352,13 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
 
                 foreach (var prop in computedProps)
                 {
-                    if (prop.Prop.HasThis != hasThis)
+                    if (prop.Prop.HasThis != method.HasThis)
                     {
                         continue;
                     }
 
-                    MethodReference funcDelegateCtor = Methods.MakeFuncDelegateConstructor(prop.Prop.PropertyType);
-                    MethodReference computedCtor = Methods.MakeLazyComputedPropertyCtor(prop.BackingField.FieldType);
-
                     // IL 指令没法复用，每次都得新创建
-                    if (hasThis)
-                    {
-                        prependInstructions.Add(il.Create(OpCodes.Ldarg_0));
-                        prependInstructions.Add(il.Create(OpCodes.Ldarg_0));
-                        prependInstructions.Add(il.Create(OpCodes.Ldftn, prop.Getter));
-                        prependInstructions.Add(il.Create(OpCodes.Newobj, funcDelegateCtor));
-                        prependInstructions.Add(il.Create(OpCodes.Newobj, computedCtor));
-                        prependInstructions.Add(il.Create(OpCodes.Stfld, prop.BackingField));
-                    }
-                    else
-                    {
-                        prependInstructions.Add(il.Create(OpCodes.Ldnull));
-                        prependInstructions.Add(il.Create(OpCodes.Ldftn, prop.Getter));
-                        prependInstructions.Add(il.Create(OpCodes.Newobj, funcDelegateCtor));
-                        prependInstructions.Add(il.Create(OpCodes.Newobj, computedCtor));
-                        prependInstructions.Add(il.Create(OpCodes.Stsfld, prop.BackingField));
-                    }
+                    AddComputedPropertyInitInstructions(prependInstructions, il, prop);
                 }
 
                 for (int i = 0; i < prependInstructions.Count; i++)
@@ -321,6 +367,30 @@ namespace VentiColaEditor.UI.CodeInjection.AssemblyInjectors
                 }
 
                 prependInstructions.Clear();
+            }
+        }
+
+        private void AddComputedPropertyInitInstructions(List<Instruction> list, ILProcessor il, ComputedPropInfo prop)
+        {
+            MethodReference funcDelegateCtor = Methods.MakeFuncDelegateConstructor(prop.Prop.PropertyType);
+            MethodReference computedCtor = Methods.MakeLazyComputedPropertyCtor(prop.BackingField.FieldType);
+
+            if (prop.Prop.HasThis)
+            {
+                list.Add(il.Create(OpCodes.Ldarg_0));
+                list.Add(il.Create(OpCodes.Ldarg_0));
+                list.Add(il.Create(OpCodes.Ldftn, prop.Getter));
+                list.Add(il.Create(OpCodes.Newobj, funcDelegateCtor));
+                list.Add(il.Create(OpCodes.Newobj, computedCtor));
+                list.Add(il.Create(OpCodes.Stfld, prop.BackingField));
+            }
+            else
+            {
+                list.Add(il.Create(OpCodes.Ldnull));
+                list.Add(il.Create(OpCodes.Ldftn, prop.Getter));
+                list.Add(il.Create(OpCodes.Newobj, funcDelegateCtor));
+                list.Add(il.Create(OpCodes.Newobj, computedCtor));
+                list.Add(il.Create(OpCodes.Stsfld, prop.BackingField));
             }
         }
 

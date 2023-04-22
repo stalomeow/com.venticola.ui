@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using VentiCola.UI.Bindings.LowLevel;
 
 namespace VentiCola.UI.Bindings
 {
@@ -16,7 +17,7 @@ namespace VentiCola.UI.Bindings
         [SerializeField] private Vector2 m_ControlPoint2;
 
         /// <summary>
-        /// 创建一条内置的缓动曲线
+        /// 创建一条基础的缓动曲线
         /// </summary>
         /// <param name="curveType">缓动曲线类型。该值不可以为 <see cref="EasingCurveType.QuadraticBezier"/>、<see cref="EasingCurveType.CubicBezier"/>、<see cref="EasingCurveType.Custom"/></param>
         /// <exception cref="ArgumentException"><paramref name="curveType"/> 为任意一个不可取的值</exception>

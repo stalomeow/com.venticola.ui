@@ -17,7 +17,7 @@ namespace VentiColaEditor.UI.Settings
     {
         private SerializedObject m_SerializedObject;
         private SerializedProperty m_AutoCodeInjection;
-        private SerializedProperty m_CodeInjectionLogLevel;
+        private SerializedProperty m_EnableCodeInjectionLog;
         private SerializedProperty m_CodeInjectionAssemblyWhiteList;
 
         private ReorderableList m_CIAssemblyWhiteList; // for m_CodeInjectionAssemblyWhiteList
@@ -69,7 +69,7 @@ namespace VentiColaEditor.UI.Settings
                 EditorGUILayout.Space();
 
                 EditorGUILayout.LabelField("Code Injection", EditorStyles.boldLabel);
-                DrawCodeInjectionLogLevelField();
+                DrawEnableCodeInjectionLogField();
                 DrawEditorOptionsFields();
                 EditorGUILayout.Space(1);
                 DrawCodeInjectionAssemblyWhiteListField();
@@ -86,7 +86,7 @@ namespace VentiColaEditor.UI.Settings
 
         private bool DrawRuntimeSettingsObjField(out UIRuntimeSettings settings)
         {
-            settings = UIRuntimeSettings.FindInstance();
+            settings = UIRuntimeSettings.Instance;
 
             if (settings == null)
             {
@@ -149,21 +149,16 @@ namespace VentiColaEditor.UI.Settings
 
         private void DrawEditorOptionsFields()
         {
-            EditorGUILayout.LabelField("Editor Options");
-
-            using (new EditorGUI.IndentLevelScope())
-            {
-                var oldValue = m_AutoCodeInjection.boolValue;
-                var newValue = EditorGUILayout.Toggle("Execute After Compilation", oldValue);
-                m_AutoCodeInjection.boolValue = newValue;
-            }
+            var oldValue = m_AutoCodeInjection.boolValue;
+            var newValue = EditorGUILayout.Toggle("Execute After Compilation", oldValue);
+            m_AutoCodeInjection.boolValue = newValue;
         }
 
-        private void DrawCodeInjectionLogLevelField()
+        private void DrawEnableCodeInjectionLogField()
         {
-            var oldLevel = (LogLevel)m_CodeInjectionLogLevel.intValue;
-            var newLevel = (LogLevel)EditorGUILayout.EnumFlagsField("Log Level", oldLevel);
-            m_CodeInjectionLogLevel.intValue = (int)newLevel;
+            var oldValue = m_EnableCodeInjectionLog.boolValue;
+            var newValue = EditorGUILayout.Toggle("Enable Log", oldValue);
+            m_EnableCodeInjectionLog.boolValue = newValue;
         }
 
         private void DrawCodeInjectionAssemblyWhiteListField()

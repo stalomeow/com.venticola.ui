@@ -2,7 +2,7 @@ using System;
 
 namespace VentiColaEditor.UI.CodeInjection
 {
-    internal readonly struct Label : IEquatable<Label>
+    public readonly struct Label : IEquatable<Label>
     {
         private readonly int m_Label;
 

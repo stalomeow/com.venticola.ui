@@ -14,8 +14,8 @@ namespace VentiColaEditor.UI.CustomEditors
     {
         private SerializedProperty m_LRUCacheSize;
         private SerializedProperty m_UIRootPrefab;
-        private SerializedProperty m_BlurFallbackTexture;
         private SerializedProperty m_Shaders;
+        private SerializedProperty m_MainCameraInactiveSettings;
         private SerializedProperty m_AdditionalData;
         private Editor m_AdditionalDataEditor;
 
@@ -48,7 +48,7 @@ namespace VentiColaEditor.UI.CustomEditors
 
         public override void OnInspectorGUI()
         {
-            if (UIRuntimeSettings.FindInstance() != target)
+            if (UIRuntimeSettings.Instance != target)
             {
                 EditorGUILayout.Space();
                 EditorGUILayout.HelpBox($"This {target.GetType().Name} object is invalid. It will not be included in build.", MessageType.Error);
@@ -61,13 +61,34 @@ namespace VentiColaEditor.UI.CustomEditors
             DrawEditProjectSettingsButton();
 
             EditorGUILayout.Space();
-            DrawGeneralSettings();
-
-            EditorGUILayout.Space();
             DrawPrefabSettings();
 
             EditorGUILayout.Space();
-            DrawPlatformSettings();
+            DrawGeneralSettings();
+
+            EditorGUILayout.Space();
+
+            EditorGUILayout.LabelField("Main Camera", EditorStyles.boldLabel);
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox("If a UI covers the entire screen, these settings will be temporarily applied to the Main Camera to reduce overdraw.", MessageType.Info);
+
+                SerializedProperty settings = m_MainCameraInactiveSettings.Copy();
+
+                while (settings.NextVisible(true))
+                {
+                    if (!settings.propertyPath.StartsWith($"{nameof(m_MainCameraInactiveSettings)}."))
+                    {
+                        break;
+                    }
+
+                    EditorGUILayout.PropertyField(settings);
+                }
+            }
+
+            EditorGUILayout.Space();
+            DrawShadersSettings();
 
             EditorGUILayout.Space();
             DrawAdditionalData();
@@ -180,7 +201,7 @@ namespace VentiColaEditor.UI.CustomEditors
             EditorSceneManager.UnloadSceneAsync(scene);
         }
 
-        private void DrawPlatformSettings()
+        private void DrawShadersSettings()
         {
             EditorGUILayout.LabelField("Shaders", EditorStyles.boldLabel);
 
@@ -197,20 +218,6 @@ namespace VentiColaEditor.UI.CustomEditors
 
                     EditorGUILayout.PropertyField(shaders);
                 }
-            }
-
-            EditorGUILayout.Space();
-
-            EditorGUILayout.LabelField("Textures", EditorStyles.boldLabel);
-
-            using (new EditorGUI.IndentLevelScope())
-            {
-                m_BlurFallbackTexture.objectReferenceValue = EditorGUILayout.ObjectField(
-                    EditorGUIUtility.TrTextContent("Blur Fallback"), m_BlurFallbackTexture.objectReferenceValue,
-                    typeof(Texture2D), false);
-
-                //EditorGUILayout.PropertyField(m_BlurFallbackTexture, EditorGUIUtility.TrTextContent("Fallback Texture"));
-
             }
         }
 
@@ -230,6 +237,11 @@ namespace VentiColaEditor.UI.CustomEditors
                 {
                     hasAdditionalData = false;
                     EditorGUILayout.HelpBox("You can extend the runtime settings by assigning a custom ScriptableObject.", MessageType.Info);
+                }
+                else if (targetDataObj == target)
+                {
+                    m_AdditionalData.objectReferenceValue = null;
+                    Debug.LogError("Assigning self to Additional Data is not allowed!");
                 }
             }
 

@@ -1,6 +1,6 @@
 namespace VentiColaEditor.UI.CodeInjection
 {
-    internal readonly struct LocalOrParameter
+    public readonly struct LocalOrParameter
     {
         private readonly bool m_IsLocal;
         private readonly int m_Index;

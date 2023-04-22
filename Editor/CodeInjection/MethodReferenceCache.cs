@@ -1,11 +1,11 @@
 using Mono.Cecil;
+using System;
 using System.Reflection;
-using VentiCola.UI;
-using VentiCola.UI.Internals;
+using VentiCola.UI.Internal;
 
 namespace VentiColaEditor.UI.CodeInjection
 {
-    internal class MethodReferenceCache
+    public class MethodReferenceCache
     {
         private readonly ModuleDefinition m_Module;
         private MethodReference m_StringHashMethod;
@@ -14,6 +14,7 @@ namespace VentiColaEditor.UI.CodeInjection
         private MethodReference m_CastAnyMethod;
         private MethodReference m_ChangeUtilityTryAddCurrentObserverMethod;
         private MethodReference m_ChangeUtilitySetWithNotifyMethod;
+        private MethodReference m_ChangeUtilitySetWithNotifyMethodWithRefComparer;
 
         public MethodReferenceCache(ModuleDefinition module)
         {
@@ -68,7 +69,7 @@ namespace VentiColaEditor.UI.CodeInjection
             }
         }
 
-        public GenericInstanceMethod MakeCastValueTypeMethod(params TypeReference[] genericArguments)
+        public MethodReference MakeCastValueTypeMethod(params TypeReference[] genericArguments)
         {
             if (m_CastValueTypeMethod is null)
             {
@@ -77,10 +78,10 @@ namespace VentiColaEditor.UI.CodeInjection
                 m_CastValueTypeMethod = m_Module.ImportReference(method);
             }
 
-            return MakeGenericMethod(m_CastValueTypeMethod, genericArguments);
+            return MetaDataUtility.MakeGenericInstanceMethod(m_CastValueTypeMethod, genericArguments);
         }
 
-        public GenericInstanceMethod MakeCastAnyMethod(params TypeReference[] genericArguments)
+        public MethodReference MakeCastAnyMethod(params TypeReference[] genericArguments)
         {
             if (m_CastAnyMethod is null)
             {
@@ -89,19 +90,42 @@ namespace VentiColaEditor.UI.CodeInjection
                 m_CastAnyMethod = m_Module.ImportReference(method);
             }
 
-            return MakeGenericMethod(m_CastAnyMethod, genericArguments);
+            return MetaDataUtility.MakeGenericInstanceMethod(m_CastAnyMethod, genericArguments);
         }
 
-        public GenericInstanceMethod MakeChangeUtilitySetWithNotifyMethod(params TypeReference[] genericArguments)
+        public MethodReference MakeChangeUtilitySetWithNotifyMethod(params TypeReference[] genericArguments)
         {
             if (m_ChangeUtilitySetWithNotifyMethod is null)
             {
                 const BindingFlags flags = BindingFlags.Public | BindingFlags.Static;
-                var method = typeof(ChangeUtility).GetMethod(nameof(ChangeUtility.SetWithNotify), flags);
+                var method = typeof(ChangeUtility).GetMethod(nameof(ChangeUtility.SetWithNotify), 1, flags, null, new Type[]
+                {
+                    Type.MakeGenericMethodParameter(0).MakeByRefType(),
+                    Type.MakeGenericMethodParameter(0),
+                    typeof(WeakHashSet<IChangeObserver>),
+                }, Array.Empty<ParameterModifier>());
                 m_ChangeUtilitySetWithNotifyMethod = m_Module.ImportReference(method);
             }
 
-            return MakeGenericMethod(m_ChangeUtilitySetWithNotifyMethod, genericArguments);
+            return MetaDataUtility.MakeGenericInstanceMethod(m_ChangeUtilitySetWithNotifyMethod, genericArguments);
+        }
+
+        public MethodReference MakeChangeUtilitySetWithNotifyMethodWithRefComparer(params TypeReference[] genericArguments)
+        {
+            if (m_ChangeUtilitySetWithNotifyMethodWithRefComparer is null)
+            {
+                const BindingFlags flags = BindingFlags.Public | BindingFlags.Static;
+                var method = typeof(ChangeUtility).GetMethod(nameof(ChangeUtility.SetWithNotify), 2, flags, null, new Type[]
+                {
+                    Type.MakeGenericMethodParameter(0).MakeByRefType(),
+                    Type.MakeGenericMethodParameter(0),
+                    typeof(WeakHashSet<IChangeObserver>),
+                    Type.MakeGenericMethodParameter(1).MakeByRefType(),
+                }, Array.Empty<ParameterModifier>());
+                m_ChangeUtilitySetWithNotifyMethodWithRefComparer = m_Module.ImportReference(method);
+            }
+
+            return MetaDataUtility.MakeGenericInstanceMethod(m_ChangeUtilitySetWithNotifyMethodWithRefComparer, genericArguments);
         }
 
         public MethodReference MakeFuncDelegateConstructor(TypeReference genericTypeArgument)
@@ -131,18 +155,6 @@ namespace VentiColaEditor.UI.CodeInjection
 
             MethodReference result = m_Module.ImportReference(method);
             result.DeclaringType = declaringType;
-            return result;
-        }
-
-        private static GenericInstanceMethod MakeGenericMethod(MethodReference genericMethodDefinition, TypeReference[] genericArguments)
-        {
-            var result = new GenericInstanceMethod(genericMethodDefinition);
-
-            for (int i = 0; i < genericArguments.Length; i++)
-            {
-                result.GenericArguments.Add(genericArguments[i]);
-            }
-
             return result;
         }
     }

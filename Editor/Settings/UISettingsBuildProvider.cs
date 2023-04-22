@@ -3,18 +3,17 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using VentiCola.UI;
+using Object = UnityEngine.Object;
 
 namespace VentiColaEditor.UI.Settings
 {
-    using Object = UnityEngine.Object;
-
     internal class UISettingsBuildProvider : IPreprocessBuildWithReport, IPostprocessBuildWithReport
     {
         public int callbackOrder => 0;
 
         public void OnPreprocessBuild(BuildReport report)
         {
-            var settings = UIRuntimeSettings.FindInstance();
+            var settings = UIRuntimeSettings.Instance;
 
             if (settings == null)
             {

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using UnityEngine;
+using VentiCola.UI.Rendering;
 
 #if UNITY_EDITOR
 using System.Reflection;
@@ -16,19 +17,16 @@ namespace VentiCola.UI
         {
             public string AssetPath { get; }
 
-            public DefaultShaderAttribute(string assetPath)
-            {
-                AssetPath = assetPath;
-            }
+            public DefaultShaderAttribute(string assetPath) => AssetPath = assetPath;
         }
 
         [Serializable]
         public class ShaderResources
         {
-            [DefaultShader("Packages/com.venticola.ui/Shaders/GaussianBlur.shader")]
+            [DefaultShader("Packages/com.venticola.ui/Shaders/GaussianBlur5x5.shader")]
             public Shader GaussianBlur5x5;
 
-            [DefaultShader("Packages/com.venticola.ui/Shaders/GaussianBlur.shader")]
+            [DefaultShader("Packages/com.venticola.ui/Shaders/GaussianBlur5x5.shader")]
             public Shader GaussianBlur3x3;
 
             public Shader BoxBlur;
@@ -42,17 +40,17 @@ namespace VentiCola.UI
 
         [SerializeField, Min(3)] private int m_LRUCacheSize = 5;
         [SerializeField] private GameObject m_UIRootPrefab;
-        [SerializeField] private Texture2D m_BlurFallbackTexture;
         [SerializeField] private ShaderResources m_Shaders;
+        [SerializeField] private CameraOverrideSettings m_MainCameraInactiveSettings;
         [SerializeField] private ScriptableObject m_AdditionalData;
 
         public int LRUCacheSize => m_LRUCacheSize;
 
         public GameObject UIRootPrefab => m_UIRootPrefab;
 
-        public Texture2D BlurFallbackTexture => m_BlurFallbackTexture;
-
         public ShaderResources DefaultShaders => m_Shaders;
+
+        public CameraOverrideSettings MainCameraInactiveSettings => m_MainCameraInactiveSettings;
 
         public T GetAdditionalData<T>() where T : ScriptableObject
         {
@@ -80,30 +78,38 @@ namespace VentiCola.UI
         }
 #endif
 
-        internal static UIRuntimeSettings FindInstance()
+        private static UIRuntimeSettings s_Instance;
+
+        public static UIRuntimeSettings Instance
         {
+            get
+            {
+                if (s_Instance == null)
+                {
 #if UNITY_EDITOR
-            if (EditorBuildSettings.TryGetConfigObject(k_ConfigName, out UIRuntimeSettings settings))
-            {
-                return settings;
-            }
-
-            return null;
+                    if (EditorBuildSettings.TryGetConfigObject(k_ConfigName, out UIRuntimeSettings settings))
+                    {
+                        s_Instance = settings;
+                    }
 #else
-            var settings = Resources.FindObjectsOfTypeAll<UIRuntimeSettings>();
+                    var settings = Resources.FindObjectsOfTypeAll<UIRuntimeSettings>();
 
-            if (settings.Length == 0)
-            {
-                throw new MissingReferenceException($"Can not find {typeof(UIRuntimeSettings)}!");
-            }
+                    if (settings.Length == 0)
+                    {
+                        throw new MissingReferenceException($"Can not find {typeof(UIRuntimeSettings)}!");
+                    }
 
-            if (settings.Length > 1)
-            {
-                UnityEngine.Debug.LogWarning($"{settings.Length} {typeof(UIRuntimeSettings)} were found! Only the first one will be used!");
-            }
+                    if (settings.Length > 1)
+                    {
+                        UnityEngine.Debug.LogWarning($"{settings.Length} {typeof(UIRuntimeSettings)} were found! Only the first one will be used!");
+                    }
 
-            return settings[0];
+                    s_Instance = settings[0];
 #endif
+                }
+
+                return s_Instance;
+            }
         }
 
         [Conditional("UNITY_EDITOR")]

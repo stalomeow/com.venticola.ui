@@ -6,7 +6,7 @@ using VentiCola.UI.Bindings;
 namespace VentiColaEditor.UI.PropertyDrawers
 {
     [CustomPropertyDrawer(typeof(EasingCurve))]
-    public class EasingCurveDrawer : PropertyDrawer
+    internal class EasingCurveDrawer : PropertyDrawer
     {
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {

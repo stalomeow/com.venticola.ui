@@ -59,14 +59,14 @@ Shader "Unlit/Blur Background"
             {
                 half2 screenUV = i.screenPos.xy / i.screenPos.w;
 
-#if UNITY_UV_STARTS_AT_TOP
-                screenUV.y = 1 - screenUV.y;
-#endif
+//#if UNITY_UV_STARTS_AT_TOP
+//                screenUV.y = 1 - screenUV.y;
+//#endif
 
-                half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv) * i.color;
-                half4 blur = half4(SampleUIBlurColor(screenUV), 1);
+                //half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv) * i.color;
+                half4 blur = half4(SampleUIBlurColor(screenUV), 1) * i.color;
 
-                return lerp(blur, tex, tex.a);
+                return blur;//lerp(blur, tex, tex.a);
             }
             ENDHLSL
         }

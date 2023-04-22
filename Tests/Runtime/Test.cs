@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using UnityEngine;
 using VentiCola.UI;
+using VentiCola.UI.Bindings;
 
 namespace VentiColaTests.UI
 {
@@ -46,6 +48,31 @@ namespace VentiColaTests.UI
         //}
 
         public static ResourcesUIManager UIManager;
+
+        private class IEq : IEqualityComparer<int>
+        {
+            public bool Equals(int x, int y)
+            {
+                return x == y;
+            }
+
+            public int GetHashCode(int obj)
+            {
+                return obj;
+            }
+        }
+
+        [Reactive(EqualityComparer = typeof(IEq))]
+        public static int sVal { get; set; }
+
+        [Reactive(EqualityComparer = typeof(IEq))]
+        public int Val { get; set; }
+
+        [Reactive(LazyComputed = true)]
+        public int cValue { get; set; }
+
+        [Reactive]
+        public int aValue => 10;
 
         private void Start()
         {
@@ -129,20 +156,21 @@ namespace VentiColaTests.UI
         {
             if (Input.GetKeyDown(KeyCode.C))
             {
-                var controller = UIManager.Allocate<TestComplexPageController>();
+                var controller = Singleton<TestComplexPageController>.Instance;
                 controller.CurrentTab = TabType.Talent;
                 controller.CurrentChar = TestCharDB.Characters[0];
-                UIManager.Open(controller);
+                UIManager.Show(controller);
             }
 
             if (Input.GetKeyDown(KeyCode.A))
             {
-                var controller = UIManager.Allocate<TestAlertBoxPageController>();
-                controller.Title = "The Hippocratic Oath";
-                controller.Message = "　　I swear by Apollo the physician, by Aesculapius, Hygeia, and Panacea, and I take to witness all the gods, all the goddesses, to keep according to my ability and my judgement the following oath.\n　　To consider dear to me as my parents him who taught me this art, to live in common with him, and if necessary to share my goods with him, to look upon him children as my own brothers, to teach them this art if they so desire without fee or written promise, to impart to my sons and the sons of the master who taught me and the disciples who have enrolled themselves and have agreed to the rules of the profession, but to these alone, the precepts and the instruction.\n　　I will prescribe regimen for the good of my patients according to my ability and my judgement and never do harm to anyone. To please no one will I prescribe a deadly drug, nor give advice which may cause his death. Nor will I give a woman a pessary to procure abortion. But I will preserve the purity of my life and my art. I will not cut for stone, even for patients in whom the disease is manifest. I will leave this operation to be performed by practitioners （specialist in this art）. In every house where I come I will enter only for the good of my patients, keeping myself far from all intentional ill-doing and all seduction. All that may come to my knowledge in the exercise of my profession or in daily commerce with men, which ought not to be spread abroad, I will keep secret and will never reveal it.\n　　If I keep this oath faithfully, may I enjoy my life and practice my art, respected by all men and in all times, but if I swerve from it or violate it, may the reverse be my lot.";
-                controller.OnConfirm = () => print("OK");
-                controller.OnCancel = () => print("???");
-                UIManager.Open(controller, true);
+                UIManager.Show(new TestAlertBoxPageController
+                {
+                    Title = "The Hippocratic Oath",
+                    Message = "　　I swear by Apollo the physician, by Aesculapius, Hygeia, and Panacea, and I take to witness all the gods, all the goddesses, to keep according to my ability and my judgement the following oath.\n　　To consider dear to me as my parents him who taught me this art, to live in common with him, and if necessary to share my goods with him, to look upon him children as my own brothers, to teach them this art if they so desire without fee or written promise, to impart to my sons and the sons of the master who taught me and the disciples who have enrolled themselves and have agreed to the rules of the profession, but to these alone, the precepts and the instruction.\n　　I will prescribe regimen for the good of my patients according to my ability and my judgement and never do harm to anyone. To please no one will I prescribe a deadly drug, nor give advice which may cause his death. Nor will I give a woman a pessary to procure abortion. But I will preserve the purity of my life and my art. I will not cut for stone, even for patients in whom the disease is manifest. I will leave this operation to be performed by practitioners （specialist in this art）. In every house where I come I will enter only for the good of my patients, keeping myself far from all intentional ill-doing and all seduction. All that may come to my knowledge in the exercise of my profession or in daily commerce with men, which ought not to be spread abroad, I will keep secret and will never reveal it.\n　　If I keep this oath faithfully, may I enjoy my life and practice my art, respected by all men and in all times, but if I swerve from it or violate it, may the reverse be my lot.",
+                    OnConfirm = () => print("OK"),
+                    OnCancel = () => print("???"),
+                });
             }
 
             if (Input.GetKeyDown(KeyCode.Escape))

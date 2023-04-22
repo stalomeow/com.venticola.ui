@@ -4,7 +4,7 @@ using System;
 
 namespace VentiColaEditor.UI.CodeInjection
 {
-    internal static class EmitUtility
+    public static class EmitUtility
     {
         public static void Emit_Ldc_I4(this ILProcessor il, int num)
         {

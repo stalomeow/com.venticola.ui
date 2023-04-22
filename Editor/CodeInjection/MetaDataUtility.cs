@@ -6,14 +6,15 @@ using System.Runtime.CompilerServices;
 
 namespace VentiColaEditor.UI.CodeInjection
 {
-    internal static class MetaDataUtility
+    public static class MetaDataUtility
     {
-        public static void ForEachAllTypes(AssemblyDefinition assembly, Action<int, int, TypeDefinition> action)
+        public delegate void ForEachAction<T>(int index, int count, T item);
+
+        public static void ForEachAllTypesIncludeNested(AssemblyDefinition assembly, ForEachAction<TypeDefinition> action)
         {
             var queue = new Queue<TypeDefinition>();
             var allTypes = new List<TypeDefinition>();
 
-            // find types including nested types
             foreach (TypeDefinition topLevelType in assembly.MainModule.Types)
             {
                 queue.Enqueue(topLevelType);
@@ -38,11 +39,11 @@ namespace VentiColaEditor.UI.CodeInjection
             }
         }
 
-        public static TypeReference ImportTypeReference(ModuleDefinition module, Type type, params TypeReference[] typeArguments)
+        public static TypeReference ImportTypeReference(ModuleDefinition module, Type type, params TypeReference[] genericArguments)
         {
-            var importedType = module.ImportReference(type);
+            TypeReference importedType = module.ImportReference(type);
 
-            if (typeArguments.Length == 0)
+            if (genericArguments.Length == 0)
             {
                 return importedType;
             }
@@ -50,55 +51,30 @@ namespace VentiColaEditor.UI.CodeInjection
             // 泛型
             var instanceType = new GenericInstanceType(importedType);
 
-            for (int i = 0; i < typeArguments.Length; i++)
+            for (int i = 0; i < genericArguments.Length; i++)
             {
-                instanceType.GenericArguments.Add(typeArguments[i]);
+                instanceType.GenericArguments.Add(genericArguments[i]);
             }
 
             return instanceType;
         }
 
-        public static bool IsSubclassOf<T>(TypeDefinition type) where T : class
+        public static MethodReference MakeGenericInstanceMethod(MethodReference importedMethod, params TypeReference[] genericArguments)
         {
-            bool isSuperType = false;
-
-            while (type != null)
+            if (genericArguments.Length == 0)
             {
-                if (type.FullName == typeof(T).FullName)
-                {
-                    // 如果一开始的 type 和 T 一样，也返回 false
-                    return isSuperType;
-                }
-
-                // Note: '<Module>' 和 object 两个类没有基类！
-                type = type.BaseType?.Resolve();
-                isSuperType = true;
+                return importedMethod;
             }
 
-            return false;
-        }
+            // 泛型
+            var instanceMethod = new GenericInstanceMethod(importedMethod);
 
-        /// <summary>
-        /// 在 <paramref name="type"/> 的继承链上往上遍历，直到类型 <typeparamref name="T"/> 或者没有基类。
-        /// 遍历时包含 <paramref name="type"/> 和 <typeparamref name="T"/>。
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="type"></param>
-        /// <param name="callback"></param>
-        public static void WalkUpTypesUntil<T>(TypeDefinition type, Action<TypeDefinition> callback) where T : class
-        {
-            while (type != null)
+            for (int i = 0; i < genericArguments.Length; i++)
             {
-                callback(type);
-
-                if (type.FullName == typeof(T).FullName)
-                {
-                    break;
-                }
-
-                // Note: '<Module>' 和 object 两个类没有基类！
-                type = type.BaseType?.Resolve();
+                instanceMethod.GenericArguments.Add(genericArguments[i]);
             }
+
+            return instanceMethod;
         }
 
         public static bool HasCustomAttribute<T>(Collection<CustomAttribute> attributes) where T : Attribute

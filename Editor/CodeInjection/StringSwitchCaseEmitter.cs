@@ -3,11 +3,11 @@ using Mono.Cecil.Cil;
 using Mono.Collections.Generic;
 using System.Collections.Generic;
 using System.Linq;
-using VentiCola.UI.Internals;
+using VentiCola.UI.Internal;
 
 namespace VentiColaEditor.UI.CodeInjection
 {
-    internal class StringSwitchCaseEmitter<T>
+    public class StringSwitchCaseEmitter<T>
     {
         // 返回值表示是否需要在后面插入转跳代码（例如 ret、br、等）
         public delegate bool CaseHandlerDelegate(ILProcessor il, MethodReferenceCache methods,

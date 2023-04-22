@@ -1,13 +1,13 @@
-using UnityEngine;
 using UnityEngine.Events;
 using VentiCola.UI;
 using VentiCola.UI.Bindings;
 
 namespace VentiColaTests.UI
 {
-    [CustomControllerForUIPage("Test Alert Box")]
-    public class TestAlertBoxPageController : BaseUIPageController
+    public class TestAlertBoxPageController : BaseUIPageController<TestAlertBoxPage>
     {
+        // only expose parameters
+
         [Reactive]
         public string Title { get; set; }
 
@@ -30,25 +30,20 @@ namespace VentiColaTests.UI
         [Reactive]
         private float BoxPositionY { get; set; } = -20;
 
-        protected override void OnDidOpen()
+        public TestAlertBoxPageController()
+        {
+            Config.PrefabKey = "Test Alert Box";
+            Config.RenderOption = UIRenderOption.FullScreenBlur;
+            Config.IsAdditive = true;
+        }
+
+        protected override void OnViewAppear()
         {
             PageAlpha = 1;
             BoxPositionY = 0;
         }
 
-        protected override void OnPause()
-        {
-            PageAlpha = 0;
-            BoxPositionY = -20;
-        }
-
-        protected override void OnResume()
-        {
-            PageAlpha = 1;
-            BoxPositionY = 0;
-        }
-
-        protected override void OnWillClose()
+        protected override void OnViewDisappear()
         {
             PageAlpha = 0;
             BoxPositionY = -20;
@@ -56,26 +51,24 @@ namespace VentiColaTests.UI
 
         protected override void SetUpViewBindings()
         {
-            var view = (TestAlertBoxPage)View;
+            View.PageCanvasGroup.alpha(() => PageAlpha, in View.AlphaTransConfig);
+            View.BoxTransfrom.anchoredPositionY(() => BoxPositionY, in View.PositionTransConfig);
 
-            view.PageCanvasGroup.alpha(() => PageAlpha, in view.AlphaTransConfig);
-            view.BoxTransfrom.anchoredPositionY(() => BoxPositionY, in view.PositionTransConfig);
+            View.TitleText.text(() => Title);
+            View.MessageText.text(() => Message);
+            View.ConfirmButtonText.text(() => ConfirmButtonText);
+            View.CancelButtonText.text(() => CancelButtonText);
 
-            view.TitleText.text(() => Title);
-            view.MessageText.text(() => Message);
-            view.ConfirmButtonText.text(() => ConfirmButtonText);
-            view.CancelButtonText.text(() => CancelButtonText);
-
-            view.ConfirmButton.onClick(() =>
+            View.ConfirmButton.onClick(() =>
             {
                 OnConfirm?.Invoke();
-                Test.UIManager.CloseTop();
+                Test.UIManager.Close(this);
             });
 
-            view.CancelButton.onClick(() =>
+            View.CancelButton.onClick(() =>
             {
                 OnCancel?.Invoke();
-                Test.UIManager.CloseTop();
+                Test.UIManager.Close(this);
             });
         }
     }

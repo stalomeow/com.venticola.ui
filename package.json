@@ -1,10 +1,13 @@
 {
   "name": "com.venticola.ui",
-  "version": "0.5.1-preview",
+  "version": "0.5.2-preview",
   "displayName": "VentiCola UI",
-  "description": "A MVVM UI framework mainly inspired by vue.",
+  "description": "A UI framework for Unity.",
   "unity": "2021.3",
   "dependencies": {
-    "com.unity.nuget.mono-cecil": "1.10.2"
+    "com.unity.modules.ui": "1.0.0",
+    "com.unity.nuget.mono-cecil": "1.10.2",
+    "com.unity.render-pipelines.core": "12.1.10",
+    "com.unity.render-pipelines.universal": "12.1.10"
   }
 }

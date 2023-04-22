@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace VentiColaEditor.UI.CodeInjection
 {
-    internal static class BranchUtility
+    public static class BranchUtility
     {
         private struct BranchData
         {
@@ -14,10 +14,8 @@ namespace VentiColaEditor.UI.CodeInjection
             public Label Label;
         }
 
-
         [ThreadStatic] private static readonly List<int> s_Labels = new();
         [ThreadStatic] private static readonly List<BranchData> s_BranchInstructions = new();
-
 
         public static Label DefineLabel(this ILProcessor _)
         {

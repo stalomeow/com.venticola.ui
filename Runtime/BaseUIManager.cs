@@ -1,61 +1,174 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
-using VentiCola.UI.Bindings;
-using VentiCola.UI.Internals;
-using Object = UnityEngine.Object;
-
-#if PACKAGE_URP
+using UnityEngine.Pool;
 using UnityEngine.Rendering.Universal;
-#endif
+using VentiCola.UI.Bindings.LowLevel;
+using VentiCola.UI.Internal;
+using VentiCola.UI.Rendering;
+using Object = UnityEngine.Object;
 
 namespace VentiCola.UI
 {
     public abstract class BaseUIManager
     {
-        private static readonly Dictionary<Type, CustomControllerForUIPageAttribute> s_ControllerConfigs = new();
+        protected enum BlockerType
+        {
+            Blur,
+            Opaque
+        }
 
-        private readonly UIRuntimeSettings m_Settings;
-        private readonly Action<object, BaseUIPageView> m_PageResolvedCallback;
-        private readonly Action<object, Exception> m_PageRejectedCallback;
-        private readonly Action<BaseUIPageController, bool> m_PageClosedCallback;
+        protected struct BlockerInfo
+        {
+            public int StackIndex;
+            public BlockerType Type;
+        }
 
-        private Transform m_UIRoot;
-        private Transform m_UIPoolRoot;
-        private List<BaseUIPageController> m_PageStack;
-        private Queue<BaseUIPageController> m_PendingPages;
-        private Dictionary<Type, BaseUIPageController> m_PersistentCache;
-        private LRUMultiHashMap<Type, BaseUIPageController> m_LRUCache;
+        protected class PrefabEntry
+        {
+            public GameObject Prefab;
+            public int RefCount;
+            public List<IViewController> WaitingList;
+        }
 
-#if PACKAGE_URP
-        private Camera m_MainCamera;
-        private Camera m_UICamera;
-#endif
+        protected class CameraSettings
+        {
+            public CameraClearFlags ClearFlags;
+            public int CullingMask;
+            public AntialiasingMode Antialiasing;
+            public bool RenderPostProcessing;
+            public bool RenderShadows;
+            public CameraOverrideOption RequiresColorOption;
+            public CameraOverrideOption RequiresDepthOption;
+            public bool Stopped;
 
-        // expose the camera of canvas
+            public void StopRenderingIfNot(Camera camera, Camera uiCamera)
+            {
+                if (Stopped)
+                {
+                    return;
+                }
+
+                var urpData = camera.GetUniversalAdditionalCameraData();
+
+                urpData.SetRenderer(2);
+
+                ClearFlags = camera.clearFlags;
+                CullingMask = camera.cullingMask;
+                Antialiasing = urpData.antialiasing;
+                RenderPostProcessing = urpData.renderPostProcessing;
+                RenderShadows = urpData.renderShadows;
+                RequiresColorOption = urpData.requiresColorOption;
+                RequiresDepthOption = urpData.requiresDepthOption;
+
+                camera.clearFlags = CameraClearFlags.Nothing;
+                camera.cullingMask = 0;
+                urpData.antialiasing = AntialiasingMode.None;
+                urpData.renderPostProcessing = false;
+                urpData.renderShadows = false;
+                urpData.requiresColorOption = CameraOverrideOption.Off;
+                urpData.requiresDepthOption = CameraOverrideOption.Off;
+
+                // disable overlay cameras
+                var stack = urpData.cameraStack;
+
+                for (int i = 0; i < stack.Count; i++)
+                {
+                    if (stack[i] == uiCamera)
+                    {
+                        break;
+                    }
+
+                    stack[i].enabled = false;
+                }
+
+                Stopped = true;
+            }
+
+            public void RestartRenderingIfNot(Camera camera, Camera uiCamera)
+            {
+                if (!Stopped)
+                {
+                    return;
+                }
+
+                var urpData = camera.GetUniversalAdditionalCameraData();
+
+                urpData.SetRenderer(0);
+
+                camera.clearFlags = ClearFlags;
+                camera.cullingMask = CullingMask;
+                urpData.antialiasing = Antialiasing;
+                urpData.renderPostProcessing = RenderPostProcessing;
+                urpData.renderShadows = RenderShadows;
+                urpData.requiresColorOption = RequiresColorOption;
+                urpData.requiresDepthOption = RequiresDepthOption;
+
+                // enable overlay cameras
+                var stack = urpData.cameraStack;
+
+                for (int i = 0; i < stack.Count; i++)
+                {
+                    if (stack[i] == uiCamera)
+                    {
+                        break;
+                    }
+
+                    stack[i].enabled = true;
+                }
+
+                Stopped = false;
+            }
+        }
+
+        protected readonly Action<string, GameObject> m_LoadPrefabCallback;
+        protected readonly Action<IViewController> m_ChangedCallback;
+        protected readonly Action<IViewController> m_ClosedCallback;
+
+        protected readonly List<IViewController> m_ViewStack;
+        protected readonly List<BlockerInfo> m_BlockerStack;
+        protected readonly Dictionary<string, PrefabEntry> m_PrefabCache;
+        protected readonly Dictionary<string, GameObject> m_PersistentCache;
+        protected readonly LRUMultiHashMap<string, GameObject> m_LRUCache;
+
+        protected Transform m_UIRoot;
+        protected Transform m_UIPoolRoot;
+        protected Camera m_MainCamera;
+        protected Camera m_UICamera;
+
+        protected CameraSettings m_MainCameraSettings = new();
 
         protected BaseUIManager()
         {
-            m_Settings = UIRuntimeSettings.FindInstance();
-            m_PageResolvedCallback = OnPageResolved;
-            m_PageRejectedCallback = OnPageRejected;
-            m_PageClosedCallback = OnPageClosed;
+            m_LoadPrefabCallback = OnLoadPrefabCompleted;
+            m_ChangedCallback = OnViewChanged;
+            m_ClosedCallback = OnViewClosed;
 
-            m_PageStack = new List<BaseUIPageController>();
-            m_PendingPages = new Queue<BaseUIPageController>();
-            m_PersistentCache = new Dictionary<Type, BaseUIPageController>();
-            m_LRUCache = new LRUMultiHashMap<Type, BaseUIPageController>(m_Settings.LRUCacheSize);
+            m_ViewStack = new List<IViewController>();
+            m_BlockerStack = new List<BlockerInfo>();
+            m_PrefabCache = new Dictionary<string, PrefabEntry>();
+            m_PersistentCache = new Dictionary<string, GameObject>();
+            m_LRUCache = new LRUMultiHashMap<string, GameObject>(UIRuntimeSettings.Instance.LRUCacheSize);
             m_LRUCache.OnEliminated += OnLRUPageEliminated;
 
             InitUIPoolRoot();
             InitUIRootAndCamera();
             InitBuiltinAnimatableTypes();
+
+            AdvancedUIRenderer.OnDidRender += frameCountWithoutBlur =>
+            {
+                if (m_MainCameraSettings.Stopped || AdvancedUIRenderer.UIChanged)
+                {
+                    return;
+                }
+
+                if (TryGetTopBlockerIfActive(out var blocker) && frameCountWithoutBlur > 10)
+                {
+                    m_MainCameraSettings.StopRenderingIfNot(m_MainCamera, m_UICamera);
+                }
+            };
         }
 
-        protected UIRuntimeSettings RuntimeSettings => m_Settings;
-
-#if PACKAGE_URP
         public Camera MainCamera
         {
             get => m_MainCamera;
@@ -78,16 +191,31 @@ namespace VentiCola.UI
                 }
             }
         }
-#endif
 
-        private void OnLRUPageEliminated(Type key, BaseUIPageController controller)
+        protected virtual void OnLRUPageEliminated(string prefabKey, GameObject viewInstance)
         {
-            var config = GetControllerConfig(controller.GetType());
+            DestroyViewInstance(prefabKey, viewInstance);
+            Debug.LogWarning($"LRU eliminate view instance '{prefabKey}'");
+        }
 
-            controller.Destroy(out BaseUIPageView view);
-            Destroy(config.ViewPrefabKey, view);
+        protected GameObject InstantiateView(PrefabEntry prefabEntry)
+        {
+            prefabEntry.RefCount++;
+            return Object.Instantiate(prefabEntry.Prefab, Vector3.zero, Quaternion.identity);
+        }
 
-            Debug.LogWarning($"LRU eliminate ui page '{config.ViewPrefabKey}'");
+        protected void DestroyViewInstance(string prefabKey, GameObject viewInstance)
+        {
+            Object.Destroy(viewInstance);
+
+            PrefabEntry entry = m_PrefabCache[prefabKey];
+            entry.RefCount--;
+
+            if (entry.RefCount <= 0)
+            {
+                m_PrefabCache.Remove(prefabKey);
+                ReleasePrefab(prefabKey, entry.Prefab);
+            }
         }
 
         private void InitUIPoolRoot()
@@ -101,7 +229,7 @@ namespace VentiCola.UI
 
         private void InitUIRootAndCamera()
         {
-            GameObject go = Object.Instantiate(m_Settings.UIRootPrefab, Vector3.zero, Quaternion.identity);
+            GameObject go = Object.Instantiate(UIRuntimeSettings.Instance.UIRootPrefab, Vector3.zero, Quaternion.identity);
             Object.DontDestroyOnLoad(go);
 
             Canvas canvas = go.GetComponentInChildren<Canvas>();
@@ -112,271 +240,415 @@ namespace VentiCola.UI
             }
 
             m_UIRoot = canvas.transform;
-
-#if PACKAGE_URP
             m_UICamera = canvas.worldCamera;
             MainCamera = Camera.main;
-#endif
         }
 
         private void InitBuiltinAnimatableTypes()
         {
-            MakeTypeAnimatable<float>(Mathf.LerpUnclamped);
-            MakeTypeAnimatable<Vector2>(Vector2.LerpUnclamped);
-            MakeTypeAnimatable<Vector3>(Vector3.LerpUnclamped);
-            MakeTypeAnimatable<Vector4>(Vector4.LerpUnclamped);
-            MakeTypeAnimatable<Color>(Color.LerpUnclamped);
+            MakeAnimatable<float>(Mathf.LerpUnclamped);
+            MakeAnimatable<Vector2>(Vector2.LerpUnclamped);
+            MakeAnimatable<Vector3>(Vector3.LerpUnclamped);
+            MakeAnimatable<Vector4>(Vector4.LerpUnclamped);
+            MakeAnimatable<Color>(Color.LerpUnclamped);
         }
 
-        protected static CustomControllerForUIPageAttribute GetControllerConfig(Type controllerType)
+        public void ShowSingleton<T>() where T : class, IViewController, new()
         {
-            if (!s_ControllerConfigs.TryGetValue(controllerType, out var config))
-            {
-                config = controllerType.GetCustomAttribute<CustomControllerForUIPageAttribute>(false);
-                s_ControllerConfigs.Add(controllerType, config);
-            }
-
-            return config;
+            Show(Singleton<T>.Instance);
         }
 
-        public T Allocate<T>() where T : BaseUIPageController, new()
+        public void Show(IViewController controller)
         {
-            var controllerType = typeof(T);
-            var config = GetControllerConfig(controllerType);
-
-            switch (config.CacheType)
+            switch (controller.State)
             {
-                case UICacheType.LastOnly:
-                    {
-                        if (m_PersistentCache.Remove(controllerType, out var controller))
-                        {
-                            return (T)controller;
-                        }
-                        break;
-                    }
+                case UIState.Active:
+                    return;
 
-                case UICacheType.LRU:
-                    {
-                        if (m_LRUCache.TryTake(controllerType, out var controller))
-                        {
-                            return (T)controller;
-                        }
-                        break;
-                    }
+                case UIState.Paused:
+                    Close(m_ViewStack[controller.StackIndex + 1]);
+                    return;
             }
 
-            return new T();
-        }
-
-        public void Open(BaseUIPageController controller, bool additive = false)
-        {
-            if (!additive)
+            if (controller.ViewInstance != null)
             {
-                PauseTopPageGroupIfNot();
-            }
-
-            controller.WillOpen(additive);
-
-            if (controller.View != null)
-            {
-                OpenPageCore(controller);
+                ShowNewView(controller);
                 return;
             }
 
-            m_PendingPages.Enqueue(controller); // 在实例化之前加入队列，因为实例化有可能立刻完成
+            string prefabKey = controller.Config.PrefabKey;
 
-            var config = GetControllerConfig(controller.GetType());
-            InstantiateAsync(config.ViewPrefabKey,
-                new PromiseCallbacks<BaseUIPageView>(controller, m_PageResolvedCallback, m_PageRejectedCallback));
+            if (!TryGetViewInstanceFromCache(prefabKey, controller.Config.CacheType, out GameObject viewInstance))
+            {
+                if (m_PrefabCache.TryGetValue(prefabKey, out PrefabEntry prefabEntry))
+                {
+                    if (prefabEntry.Prefab == null)
+                    {
+                        if (!prefabEntry.WaitingList.Contains(controller))
+                        {
+                            prefabEntry.WaitingList.Add(controller);
+                        }
+                        return;
+                    }
+
+                    viewInstance = InstantiateView(prefabEntry);
+                }
+                else
+                {
+                    List<IViewController> waitingList = ListPool<IViewController>.Get();
+                    waitingList.Add(controller);
+
+                    m_PrefabCache.Add(prefabKey, new PrefabEntry { WaitingList = waitingList });
+                    LoadPrefabAsync(prefabKey, m_LoadPrefabCallback);
+                    return;
+                }
+            }
+
+            controller.InitView(viewInstance);
+            ShowNewView(controller);
         }
 
-        private void PauseTopPageGroupIfNot()
+        protected void ShowNewView(IViewController controller)
         {
-            for (int i = m_PageStack.Count - 1; i >= 0; i--)
-            {
-                var controller = m_PageStack[i];
+            int stackIndex = m_ViewStack.Count;
+            GameObject viewInstance = controller.ViewInstance;
 
-                if (controller.State != UIPageControllerState.Paused)
+            if (!controller.Config.IsAdditive)
+            {
+                PauseTopPageGroup();
+            }
+
+            SetGameObjectLayer(viewInstance, AdvancedUIRenderer.TopLayer);
+            SetGameObjectParent(viewInstance, m_UIRoot, true);
+
+            m_ViewStack.Add(controller);
+            controller.Open(stackIndex);
+            controller.OnViewChanged += m_ChangedCallback;
+            controller.OnClosingCompleted += m_ClosedCallback;
+
+            if (!viewInstance.activeSelf)
+            {
+                viewInstance.SetActive(true);
+            }
+
+            if (controller.Config.RenderOption != UIRenderOption.None)
+            {
+                AddBlocker(new BlockerInfo
+                {
+                    StackIndex = stackIndex,
+                    Type = controller.Config.RenderOption switch
+                    {
+                        UIRenderOption.FullScreenBlur => BlockerType.Blur,
+                        UIRenderOption.FullScreenOpaque => BlockerType.Opaque,
+                        _ => throw new NotImplementedException()
+                    },
+                });
+            }
+
+            UpdateRenderer();
+        }
+
+        protected bool TryGetViewInstanceFromCache(string key, UICacheType cacheType, out GameObject viewInstance)
+        {
+            switch (cacheType)
+            {
+                case UICacheType.One:
+                    return m_PersistentCache.Remove(key, out viewInstance);
+
+                case UICacheType.LRU:
+                    return m_LRUCache.TryTake(key, out viewInstance);
+            }
+
+            viewInstance = null;
+            return false;
+        }
+
+        protected void PauseTopPageGroup()
+        {
+            for (int i = m_ViewStack.Count - 1; i >= 0; i--)
+            {
+                IViewController controller = m_ViewStack[i];
+
+                if (controller.State != UIState.Paused)
                 {
                     controller.Pause();
                 }
 
-                if (!controller.IsAdditive)
+                if (!controller.Config.IsAdditive)
                 {
                     break;
                 }
             }
         }
 
-        private void ResumeTopPageGroupIfNot()
+        protected void AddBlocker(BlockerInfo blocker)
         {
-            for (int i = m_PageStack.Count - 1; i >= 0; i--)
-            {
-                var controller = m_PageStack[i];
+            int lastBlockerIndex = m_BlockerStack.Count - 1;
+            int i = lastBlockerIndex < 0 ? 0 : m_BlockerStack[lastBlockerIndex].StackIndex;
 
-                if (controller.State != UIPageControllerState.Active)
+            while (i < blocker.StackIndex)
+            {
+                SetGameObjectLayer(m_ViewStack[i].ViewInstance, AdvancedUIRenderer.NormalLayer);
+                i++;
+            }
+
+            m_BlockerStack.Add(blocker);
+        }
+
+        protected void UpdateRenderer()
+        {
+            AdvancedUIRenderer.UseBlur = TryGetTopBlockerIfActive(out BlockerInfo blocker)
+                && (blocker.Type == BlockerType.Blur);
+            AdvancedUIRenderer.UIChanged = true;
+            m_MainCameraSettings.RestartRenderingIfNot(m_MainCamera, m_UICamera);
+        }
+
+        protected virtual void OnLoadPrefabCompleted(string prefabKey, GameObject prefab)
+        {
+            PrefabEntry entry = m_PrefabCache[prefabKey];
+
+            if (prefab == null)
+            {
+                m_PrefabCache.Remove(prefabKey);
+            }
+            else
+            {
+                entry.Prefab = prefab;
+
+                for (int i = 0; i < entry.WaitingList.Count; i++)
+                {
+                    IViewController controller = entry.WaitingList[i];
+                    controller.InitView(InstantiateView(entry));
+                    ShowNewView(controller);
+                }
+            }
+
+            ListPool<IViewController>.Release(entry.WaitingList);
+            entry.WaitingList = null;
+        }
+
+        protected virtual void OnViewChanged(IViewController controller)
+        {
+            int stackIndex = controller.StackIndex;
+            int blockerCount = 0;
+            int opaqueBlockerCount = 0;
+
+            for (int i = m_BlockerStack.Count - 1; i >= 0; i--)
+            {
+                BlockerInfo blocker = m_BlockerStack[i];
+
+                if (blocker.StackIndex <= stackIndex)
+                {
+                    break;
+                }
+
+                blockerCount++;
+
+                if (blocker.Type == BlockerType.Opaque)
+                {
+                    opaqueBlockerCount++;
+                    break;
+                }
+            }
+
+            if (blockerCount > 0 && opaqueBlockerCount == 0)
+            {
+                UpdateRenderer();
+            }
+        }
+
+        protected bool TryGetTopBlockerIfActive(out BlockerInfo blocker)
+        {
+            if (m_BlockerStack.Count > 0)
+            {
+                blocker = m_BlockerStack[^1];
+
+                if (m_ViewStack[blocker.StackIndex].State != UIState.Active)
+                {
+                    blocker = default;
+                    return false;
+                }
+
+                return true;
+            }
+
+            blocker = default;
+            return false;
+        }
+
+        protected void ResumeTopPageGroup()
+        {
+            for (int i = m_ViewStack.Count - 1; i >= 0; i--)
+            {
+                var controller = m_ViewStack[i];
+
+                if (controller.State != UIState.Active)
                 {
                     controller.Resume();
                 }
 
-                if (!controller.IsAdditive)
+                if (!controller.Config.IsAdditive)
                 {
                     break;
                 }
             }
-        }
-
-        private void OnPageResolved(object state, BaseUIPageView page)
-        {
-            var controller = (BaseUIPageController)state;
-            controller.SetView(page);
-            OpenPendingPages();
-        }
-
-        private void OnPageRejected(object state, Exception exception)
-        {
-            var controller = (BaseUIPageController)state;
-            var config = GetControllerConfig(controller.GetType());
-
-            Debug.LogException(exception);
-            Debug.LogError($"Failed to instantiate ui page '{config.ViewPrefabKey}'.");
-
-            controller.SetView(null);
-            OpenPendingPages();
-        }
-
-        private void OpenPendingPages()
-        {
-            while (m_PendingPages.TryPeek(out BaseUIPageController controller))
-            {
-                if (controller.State != UIPageControllerState.WillOpen)
-                {
-                    m_PendingPages.Dequeue();
-
-                    if (controller.State == UIPageControllerState.Error)
-                    {
-                        controller.Destroy(out _);
-                    }
-
-                    ResumeTopPageGroupIfNot();
-                    continue;
-                }
-
-                if (controller.View == null)
-                {
-                    break; // View 还在加载
-                }
-
-                m_PendingPages.Dequeue();
-
-                if (!controller.IsAdditive)
-                {
-                    PauseTopPageGroupIfNot();
-                }
-
-                OpenPageCore(controller);
-            }
-        }
-
-        private void OpenPageCore(BaseUIPageController controller)
-        {
-            SetPageParent(controller.View, m_UIRoot); // 从此处真正开始渲染
-            m_PageStack.Add(controller);
-            controller.Open();
-        }
-
-        private static void SetPageParent(BaseUIPageView page, Transform parent)
-        {
-            page.transform.SetParent(parent, false);
         }
 
         public void CloseTop()
         {
-            if (m_PendingPages.Count > 0 || m_PageStack.Count == 0)
+            if (m_ViewStack.Count > 0)
+            {
+                CloseLast();
+            }
+        }
+
+        public void Close(IViewController controller)
+        {
+            if (controller.State is (UIState.Closing or UIState.Closed))
             {
                 return;
             }
 
-            var lastIndex = m_PageStack.Count - 1;
-            var topController = m_PageStack[lastIndex];
-            m_PageStack.RemoveAt(lastIndex);
+            int stackIndex = controller.StackIndex;
 
-            var isTopAdditive = topController.IsAdditive;
-            ClosePageCore(topController);
-
-            if (!isTopAdditive)
+            while (m_ViewStack.Count > stackIndex)
             {
-                ResumeTopPageGroupIfNot();
-            }
-        }
-
-        private void ClosePageCore(BaseUIPageController topController)
-        {
-            var topControllerType = topController.GetType();
-            var config = GetControllerConfig(topControllerType);
-
-            switch (config.CacheType)
-            {
-                case UICacheType.LastOnly: // 只保留最后一个
-                    if (m_PersistentCache.Remove(topControllerType, out var prevController))
-                    {
-                        prevController.Destroy(out BaseUIPageView view);
-                        Destroy(config.ViewPrefabKey, view);
-                    }
-                    m_PersistentCache.Add(topControllerType, topController);
-                    break;
-
-                case UICacheType.LRU:
-                    m_LRUCache.Add(topControllerType, topController);
-                    break;
+                CloseLast();
             }
 
-            topController.Close(m_PageClosedCallback);
-        }
-
-        private void OnPageClosed(BaseUIPageController controller, bool success)
-        {
-            var config = GetControllerConfig(controller.GetType());
-
-            if (config.CacheType == UICacheType.Never)
-            {
-                controller.Destroy(out BaseUIPageView view);
-                Destroy(config.ViewPrefabKey, view);
-            }
-            else
-            {
-                SetPageParent(controller.View, m_UIPoolRoot);
-            }
+            UpdateRenderer();
         }
 
         public void CloseAll()
         {
-            for (int i = m_PageStack.Count - 1; i >= 0; i--)
+            while (m_ViewStack.Count > 0)
             {
-                ClosePageCore(m_PageStack[i]);
+                CloseLast();
             }
 
-            m_PendingPages.Clear();
-            m_PageStack.Clear();
+            UpdateRenderer();
         }
 
-        public void MakeTypeAnimatable<T>(InterpolateFunction<T> interpolateFunction)
+        protected void CloseLast()
+        {
+            if (m_ViewStack.Count <= 0)
+            {
+                return;
+            }
+
+            IViewController controller = m_ViewStack.PopBackUnsafe();
+
+            if (!controller.Config.IsAdditive)
+            {
+                ResumeTopPageGroup();
+            }
+
+            int lastBlockerIndex = m_BlockerStack.Count - 1;
+
+            if (lastBlockerIndex >= 0)
+            {
+                BlockerInfo blocker = m_BlockerStack[lastBlockerIndex];
+
+                if (blocker.StackIndex == controller.StackIndex)
+                {
+                    m_BlockerStack.RemoveAt(lastBlockerIndex);
+
+                    int i = m_BlockerStack.Count > 0
+                        ? m_BlockerStack[^1].StackIndex
+                        : 0;
+
+                    while (i < blocker.StackIndex)
+                    {
+                        SetGameObjectLayer(m_ViewStack[i].ViewInstance, AdvancedUIRenderer.TopLayer);
+                        i++;
+                    }
+                }
+            }
+
+            controller.Close();
+        }
+
+        protected virtual void OnViewClosed(IViewController controller)
+        {
+            string prefabKey = controller.Config.PrefabKey;
+            GameObject viewInstance = controller.ViewInstance;
+
+            switch (controller.Config.CacheType)
+            {
+                case UICacheType.One:
+                    {
+                        if (m_PersistentCache.ContainsKey(prefabKey))
+                        {
+                            goto case UICacheType.Never;
+                        }
+
+                        m_PersistentCache.Add(prefabKey, viewInstance);
+                        break;
+                    }
+
+                case UICacheType.LRU:
+                    {
+                        m_LRUCache.Add(prefabKey, viewInstance);
+                        break;
+                    }
+
+                case UICacheType.Never:
+                    {
+                        DestroyViewInstance(prefabKey, viewInstance);
+                        return;
+                    }
+            }
+
+            // Disable the object first, then reparent it into the pool.
+            viewInstance.SetActive(false);
+            SetGameObjectParent(viewInstance, m_UIPoolRoot, false);
+        }
+
+        public void MakeAnimatable<T>(InterpolateFunction<T> interpolateFunction)
         {
             InterpolationCache<T>.InterpolateFunc = interpolateFunction;
         }
 
-        /// <summary>
-        /// 异步实例化一个 UI 页面
-        /// </summary>
-        /// <param name="key">UI 页面的 Key</param>
-        /// <param name="callbacks">callbacks</param>
-        protected abstract void InstantiateAsync(string key, PromiseCallbacks<BaseUIPageView> callbacks);
+        private static void SetGameObjectParent(GameObject go, Transform parent, bool setAsLastSibling)
+        {
+            Transform transform = go.transform;
+            transform.SetParent(parent, false);
 
-        /// <summary>
-        /// 销毁一个 UI 页面
-        /// </summary>
-        /// <param name="key">UI 页面的 Key</param>
-        /// <param name="page">UI 页面对象</param>
-        protected abstract void Destroy(string key, BaseUIPageView page);
+            if (setAsLastSibling)
+            {
+                transform.SetAsLastSibling();
+            }
+        }
+
+        private static void SetGameObjectLayer(GameObject go, int layer)
+        {
+            List<Transform> stack = ListPool<Transform>.Get();
+            stack.Add(go.transform);
+
+            while (stack.Count > 0)
+            {
+                Transform top = stack.PopBackUnsafe();
+                GameObject topGO = top.gameObject;
+
+                if (topGO.layer == layer)
+                {
+                    break;
+                }
+
+                topGO.layer = layer;
+
+                int childCount = top.childCount;
+                for (int i = 0; i < childCount; i++)
+                {
+                    stack.Add(top.GetChild(i));
+                }
+            }
+
+            ListPool<Transform>.Release(stack);
+        }
+
+        protected abstract void LoadPrefabAsync(string key, Action<string, GameObject> callback);
+
+        protected abstract void ReleasePrefab(string key, GameObject prefab);
     }
 }

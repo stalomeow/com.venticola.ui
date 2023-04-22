@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
-using VentiColaEditor.UI.CodeInjection;
 
 namespace VentiColaEditor.UI.Settings
 {
@@ -9,7 +8,7 @@ namespace VentiColaEditor.UI.Settings
     public sealed class UIProjectSettings : ScriptableSingleton<UIProjectSettings>
     {
         [SerializeField] private bool m_AutoCodeInjection = true;
-        [SerializeField] private LogLevel m_CodeInjectionLogLevel = LogLevel.Assembly;
+        [SerializeField] private bool m_EnableCodeInjectionLog = true;
         [SerializeField] private List<string> m_CodeInjectionAssemblyWhiteList = new()
         {
             "Assembly-CSharp",
@@ -17,7 +16,7 @@ namespace VentiColaEditor.UI.Settings
         };
 
         /// <summary>
-        /// 获取/设置是否自动执行 Code Injection。
+        /// 是否自动执行 Code Injection。
         /// </summary>
         public bool AutoCodeInjection
         {
@@ -26,12 +25,12 @@ namespace VentiColaEditor.UI.Settings
         }
 
         /// <summary>
-        /// 获取/设置 Code Injection 的日志输出级别。
+        /// 是否允许 Code Injection 输出日志。
         /// </summary>
-        public LogLevel CodeInjectionLogLevel
+        public bool EnableCodeInjectionLog
         {
-            get => m_CodeInjectionLogLevel;
-            set => m_CodeInjectionLogLevel = value;
+            get => m_EnableCodeInjectionLog;
+            set => m_EnableCodeInjectionLog = value;
         }
 
         /// <summary>
@@ -42,7 +41,6 @@ namespace VentiColaEditor.UI.Settings
             get => m_CodeInjectionAssemblyWhiteList;
         }
 
-
         private void OnEnable() => hideFlags &= ~HideFlags.NotEditable;
 
         private void OnDisable() => Save();
@@ -50,7 +48,6 @@ namespace VentiColaEditor.UI.Settings
         public void Save() => Save(true);
 
         public SerializedObject AsSerializedObject() => new SerializedObject(this);
-
 
         /// <summary>
         /// 在 ProjectSettings 窗口中的路径

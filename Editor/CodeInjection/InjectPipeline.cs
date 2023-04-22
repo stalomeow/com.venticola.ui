@@ -6,9 +6,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Compilation;
-using UnityEngine.Assertions;
-using VentiCola.UI.Internals;
-using VentiColaEditor.UI.CodeInjection.AssemblyInjectors;
+using VentiCola.UI.Internal;
 using VentiColaEditor.UI.Settings;
 using Debug = UnityEngine.Debug;
 
@@ -16,85 +14,35 @@ namespace VentiColaEditor.UI.CodeInjection
 {
     public static class InjectPipeline
     {
-        private const string k_ForceRecompileAndInjectKey = "com.stalo.venticola.ui.force-recompile-inject";
-
-        private static bool ForceRecompileAndInject
-        {
-            get => SessionState.GetBool(k_ForceRecompileAndInjectKey, false);
-            set
-            {
-                if (value)
-                {
-                    SessionState.SetBool(k_ForceRecompileAndInjectKey, true);
-                }
-                else
-                {
-                    SessionState.EraseBool(k_ForceRecompileAndInjectKey);
-                }
-            }
-        }
-
-        private static int s_RunningCompilationCount = 0;
-        private static readonly HashSet<string> s_CompiledAssemblyPaths = new();
-
+        // 在 Force Recompile 前设置字段为 true
+        // 当 Recompilation 完全结束后（Injection 也结束力），会有一次 Domain Reload，该字段又自动变为 false
+        private static bool s_IsForceRecompilng = false;
 
         [InitializeOnLoadMethod]
         private static void Initialize()
         {
             // we should inject codes before unity reloads domain
-
-            CompilationPipeline.compilationStarted -= OnCompilationStarted; // just in case
-            CompilationPipeline.compilationStarted += OnCompilationStarted;
-
             CompilationPipeline.assemblyCompilationFinished -= OnAssemblyCompilationFinished; // just in case
             CompilationPipeline.assemblyCompilationFinished += OnAssemblyCompilationFinished;
-
-            CompilationPipeline.compilationFinished -= OnCompilationFinished; // just in case
-            CompilationPipeline.compilationFinished += OnCompilationFinished;
-        }
-
-        private static void OnCompilationStarted(object context)
-        {
-            s_RunningCompilationCount++;
         }
 
         private static void OnAssemblyCompilationFinished(string assemblyPath, CompilerMessage[] messages)
         {
-            if (messages.All(msg => msg.type != CompilerMessageType.Error))
+            if (messages.Any(msg => msg.type == CompilerMessageType.Error))
             {
-                s_CompiledAssemblyPaths.Add(assemblyPath);
+                return;
+            }
+
+            // Note: 如果是在打包时编译的，那无论如何都要注入代码！
+            if (s_IsForceRecompilng || UIProjectSettings.instance.AutoCodeInjection || BuildPipeline.isBuildingPlayer)
+            {
+                InjectCodesForAssemblies(new string[] { assemblyPath });
             }
         }
-
-        private static void OnCompilationFinished(object context)
-        {
-            s_RunningCompilationCount--;
-
-            Assert.IsTrue(s_RunningCompilationCount >= 0, "RunningCompilationCount is non-negative.");
-
-            if (s_RunningCompilationCount == 0)
-            {
-                bool forceRecompileAndInject = ForceRecompileAndInject;
-
-                // Note: 如果是在打包时编译的，那无论如何都要注入代码！
-                if (forceRecompileAndInject || UIProjectSettings.instance.AutoCodeInjection || BuildPipeline.isBuildingPlayer)
-                {
-                    InjectCodesForAssemblies(s_CompiledAssemblyPaths);
-                }
-
-                if (forceRecompileAndInject)
-                {
-                    // erase the value
-                    ForceRecompileAndInject = false;
-                }
-
-                s_CompiledAssemblyPaths.Clear();
-            }
-        }
-
 
         [MenuItem("VentiCola/UI/Inject Codes (Reload)", true)]
-        private static bool InjectCodesWithReloadValidator()
+        [MenuItem("VentiCola/UI/Inject Codes (Recompile)", true)]
+        private static bool InjectCodesValidator()
         {
             return !EditorApplication.isCompiling && !EditorApplication.isPlaying;
         }
@@ -102,7 +50,7 @@ namespace VentiColaEditor.UI.CodeInjection
         [MenuItem("VentiCola/UI/Inject Codes (Reload)")]
         public static void InjectCodesWithReload()
         {
-            if (!InjectCodesWithReloadValidator())
+            if (!InjectCodesValidator())
             {
                 return;
             }
@@ -120,16 +68,10 @@ namespace VentiColaEditor.UI.CodeInjection
             }
         }
 
-        [MenuItem("VentiCola/UI/Inject Codes (Recompile)", true)]
-        private static bool InjectCodesWithRecompilationValidator()
-        {
-            return !EditorApplication.isCompiling && !EditorApplication.isPlaying;
-        }
-
         [MenuItem("VentiCola/UI/Inject Codes (Recompile)")]
         public static void InjectCodesWithRecompilation()
         {
-            if (!InjectCodesWithRecompilationValidator())
+            if (!InjectCodesValidator())
             {
                 return;
             }
@@ -138,11 +80,10 @@ namespace VentiColaEditor.UI.CodeInjection
 
             if (EditorUtility.DisplayDialog("UI Code Injection", message, "Continue", "Cancel"))
             {
-                ForceRecompileAndInject = true;
+                s_IsForceRecompilng = true;
                 CompilationPipeline.RequestScriptCompilation(RequestScriptCompilationOptions.CleanBuildCache);
             }
         }
-
 
         private static List<string> FilterAssemblyPaths(IEnumerable<string> assemblyPaths, IEnumerable<string> assemblyNameWhiteList)
         {
@@ -162,24 +103,10 @@ namespace VentiColaEditor.UI.CodeInjection
             return results;
         }
 
-        private static List<AssemblyDefinition> ReadAssembliesAndAddToCache(IEnumerable<string> assemblyPaths, UnityAssemblyResolver assemblyResolver)
+        private static UnityEngine.Object GetAssemblyDefinitionAsset(AssemblyDefinition assembly)
         {
-            var results = new List<AssemblyDefinition>();
-
-            foreach (var path in assemblyPaths)
-            {
-                var assembly = AssemblyDefinition.ReadAssembly(Path.GetFullPath(path), new ReaderParameters()
-                {
-                    ReadSymbols = true,
-                    ReadWrite = true,
-                    AssemblyResolver = assemblyResolver
-                });
-
-                assemblyResolver.AddAssemblyToCache(assembly);
-                results.Add(assembly);
-            }
-
-            return results;
+            var asmDefPath = CompilationPipeline.GetAssemblyDefinitionFilePathFromAssemblyName(assembly.Name.Name);
+            return AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(asmDefPath);
         }
 
         private static bool InjectCodesForAssemblies(IEnumerable<string> assemblyPaths)
@@ -193,85 +120,64 @@ namespace VentiColaEditor.UI.CodeInjection
             }
 
             var watch = new Stopwatch();
-            var assemblyResolver = new UnityAssemblyResolver();
             var injectorTypes = TypeCache.GetTypesDerivedFrom<IAssemblyInjector>();
             var injectedAssemblyCount = 0;
 
             try
             {
-                // 提前缓存新编译的程序集。因为后面可能会往里面注入代码，所以必须以 RW 权限打开。
-                // 但是如果在写入程序集前，该程序集已经被 Resolve 的话，是以 R 权限打开的，无法写入，还占用了文件。
-                List<AssemblyDefinition> assemblies = ReadAssembliesAndAddToCache(validAssemblyPaths, assemblyResolver);
-
-                for (int i = 0; i < assemblies.Count; i++)
+                for (int i = 0; i < validAssemblyPaths.Count; i++)
                 {
-                    var assembly = assemblies[i];
-                    var assemblyName = assembly.Name.Name;
-
-                    var injectedAnyCode = false;
-                    var progressBarTitle = $"Injecting UI Codes ({i + 1}/{validAssemblyPaths.Count})";
-                    EditorUtility.DisplayProgressBar(progressBarTitle, string.Empty, 0);
-
-                    watch.Restart();
+                    AssemblyDefinition assembly = null;
 
                     try
                     {
-                        injectedAnyCode = InjectCodesForAssembly(assembly,
-                            settings.CodeInjectionLogLevel, injectorTypes, progressBarTitle);
+                        watch.Restart();
+
+                        string assemblyFullPath = Path.GetFullPath(validAssemblyPaths[i]);
+                        assembly = AssemblyDefinition.ReadAssembly(assemblyFullPath, new ReaderParameters()
+                        {
+                            ReadSymbols = true,
+                            ReadWrite = true
+                        });
+
+                        if (InjectCodesForAssembly(assembly, injectorTypes, displayProgress))
+                        {
+                            injectedAssemblyCount++;
+
+                            if (settings.EnableCodeInjectionLog)
+                            {
+                                var totalSeconds = watch.ElapsedMilliseconds / 1000f;
+                                var asmDefObj = GetAssemblyDefinitionAsset(assembly);
+                                Debug.Log($"Injected UI codes for assembly <b>'{assembly.Name.Name}'</b> in {totalSeconds:N4} seconds.", asmDefObj);
+                            }
+                        }
+
+                        void displayProgress(float progress)
+                        {
+                            string title = $"Injecting UI Codes ({i + 1}/{validAssemblyPaths.Count})";
+                            EditorUtility.DisplayProgressBar(title, assemblyFullPath, progress);
+                        }
                     }
                     catch (Exception e)
                     {
                         Debug.LogException(e);
-                        Debug.LogError($"Failed to inject UI codes for assembly <b>'{assemblyName}'</b>!");
+                        Debug.LogError($"Failed to inject UI codes for assembly <b>'{assembly?.Name.Name ?? validAssemblyPaths[i]}'</b>!");
                     }
-
-                    if (injectedAnyCode)
+                    finally
                     {
-                        injectedAssemblyCount++;
-
-                        if (settings.CodeInjectionLogLevel.HasFlag(LogLevel.Assembly))
-                        {
-                            var totalSeconds = watch.ElapsedMilliseconds / 1000f;
-                            var asmDefPath = CompilationPipeline.GetAssemblyDefinitionFilePathFromAssemblyName(assemblyName);
-                            var asmDefObj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(asmDefPath);
-                            Debug.Log($"Injected UI codes for assembly <b>'{assemblyName}'</b> in {totalSeconds:N4} seconds.", asmDefObj);
-                        }
+                        assembly?.Dispose();
                     }
                 }
             }
-            catch (AccessViolationException)
-            {
-                Debug.LogWarning("AccessViolation, Retry!");
-                EditorApplication.delayCall += InjectCodesWithReload;
-            }
-            catch (Exception e)
-            {
-                Debug.LogException(e);
-                Debug.LogError("An error occurred when injecting UI codes.");
-            }
             finally
             {
-                assemblyResolver.Dispose();
                 EditorUtility.ClearProgressBar();
             }
 
             return injectedAssemblyCount > 0;
         }
 
-        private static bool IsAssemblyInjected(AssemblyDefinition assembly)
-        {
-            return MetaDataUtility.HasCustomAttribute<VentiColaUICodesInjectedAttribute>(assembly.CustomAttributes);
-        }
-
-        private static void MarkAssemblyInjected(AssemblyDefinition assembly)
-        {
-            var ctorInfo = typeof(VentiColaUICodesInjectedAttribute).GetConstructor(Type.EmptyTypes);
-            var ctorRef = assembly.MainModule.ImportReference(ctorInfo);
-            assembly.CustomAttributes.Add(new CustomAttribute(ctorRef));
-        }
-
-        private static bool InjectCodesForAssembly(AssemblyDefinition assembly, LogLevel logLevel,
-            TypeCache.TypeCollection injectorTypes, string progressBarTitle)
+        private static bool InjectCodesForAssembly(AssemblyDefinition assembly, TypeCache.TypeCollection injectorTypes, Action<float> progressCallback)
         {
             if (IsAssemblyInjected(assembly))
             {
@@ -286,18 +192,11 @@ namespace VentiColaEditor.UI.CodeInjection
             {
                 var injector = Activator.CreateInstance(injectorTypes[i]) as IAssemblyInjector;
 
-                // init properties
                 injector.Assembly = assembly;
                 injector.Methods = methodCache;
-                injector.LogLevel = logLevel;
-                injector.Progress = new SimpleProgress<float>(value =>
-                {
-                    string info = $"{injector.DisplayTitle} >>> {assembly.Name.Name}";
-                    EditorUtility.DisplayProgressBar(progressBarTitle, info, (value + i) / injectorTypes.Count);
-                });
+                injector.ProgressCallback = (value => progressCallback((value + i) / injectorTypes.Count));
 
-                // execute
-                injectedAnyCode |= injector.InjectAssembly();
+                injectedAnyCode |= injector.Execute();
             }
 
             // apply new codes
@@ -310,6 +209,18 @@ namespace VentiColaEditor.UI.CodeInjection
             // 不应该在这里释放 assembly
 
             return injectedAnyCode;
+        }
+
+        private static bool IsAssemblyInjected(AssemblyDefinition assembly)
+        {
+            return MetaDataUtility.HasCustomAttribute<VentiColaUICodesInjectedAttribute>(assembly.CustomAttributes);
+        }
+
+        private static void MarkAssemblyInjected(AssemblyDefinition assembly)
+        {
+            var ctorInfo = typeof(VentiColaUICodesInjectedAttribute).GetConstructor(Type.EmptyTypes);
+            var ctorRef = assembly.MainModule.ImportReference(ctorInfo);
+            assembly.CustomAttributes.Add(new CustomAttribute(ctorRef));
         }
     }
 }

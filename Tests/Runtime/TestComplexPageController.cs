@@ -5,8 +5,7 @@ using VentiCola.UI.Bindings;
 
 namespace VentiColaTests.UI
 {
-    [CustomControllerForUIPage("Test Complex UI", CacheType = UICacheType.LastOnly, ClearHistory = false)]
-    public class TestComplexPageController : BaseUIPageController
+    public class TestComplexPageController : BaseUIPageController<TestComplexPage>
     {
         private SharedValue<TransitionConfig> m_ExpBarFillAmountSharedTransConfig = new();
 
@@ -18,6 +17,11 @@ namespace VentiColaTests.UI
 
         [Reactive]
         private float PageAlpha { get; set; } = 0;
+
+        public TestComplexPageController()
+        {
+            Config.PrefabKey = "Test Complex UI";
+        }
 
         private void OnDrag(PointerEventData eventData)
         {
@@ -84,97 +88,87 @@ namespace VentiColaTests.UI
             //}
         }
 
-        protected override void OnDidOpen()
+        protected override void OnViewAppear()
         {
             PageAlpha = 1;
+            // View.Animator.SetTrigger("Open");
         }
 
-        protected override void OnResume()
-        {
-            PageAlpha = 1;
-        }
-
-        protected override void OnPause()
+        protected override void OnViewDisappear()
         {
             PageAlpha = 0;
-        }
-
-        protected override void OnWillClose()
-        {
-            PageAlpha = 0;
+            // View.Animator.SetTrigger("Close");
         }
 
         protected override void SetUpViewBindings()
         {
-            var view = (TestComplexPage)View;
+            BindTopBar();
+            BindTabs();
 
-            BindTopBar(view);
-            BindTabs(view);
+            View.PageCanvasGroup.alpha(() => PageAlpha, in View.PageAlphaTransConfig);
+            View.CloseButton.onClick(() => Test.UIManager.Close(this));
 
-            view.PageCanvasGroup.alpha(() => PageAlpha, in view.PageAlphaTransConfig);
-            view.CloseButton.onClick(() => Test.UIManager.CloseTop());
-
-            view.PropertiesTab.ShowIf(() => CurrentTab == TabType.Properties, () =>
+            View.PropertiesTab.ShowIf(() => CurrentTab == TabType.Properties, () =>
             {
-                view.CharNameText.text(() => CurrentChar.Name);
-                view.CharLevelText.text(() => $"等级{CurrentChar.Level} / {CurrentChar.MaxLevel}");
+                View.CharNameText.text(() => CurrentChar.Name);
+                View.CharLevelText.text(() => $"等级{CurrentChar.Level} / {CurrentChar.MaxLevel}");
 
-                view.CharExpBarInnerImage.fillAmount(() => CurrentChar.ExpBarFillAmount, m_ExpBarFillAmountSharedTransConfig);
-                view.CharExpBarLabelText.text(() => $"{CurrentChar.Exp} / {CurrentChar.MaxExp}");
+                View.CharExpBarInnerImage.fillAmount(() => CurrentChar.ExpBarFillAmount, m_ExpBarFillAmountSharedTransConfig);
+                View.CharExpBarLabelText.text(() => $"{CurrentChar.Exp} / {CurrentChar.MaxExp}");
 
-                view.CharMaxHPValueText.text(() => CurrentChar.MaxHp.ToString());
-                view.CharATKValueText.text(() => CurrentChar.ATK.ToString());
-                view.CharDEFValueText.text(() => CurrentChar.DEF.ToString());
+                View.CharMaxHPValueText.text(() => CurrentChar.MaxHp.ToString());
+                View.CharATKValueText.text(() => CurrentChar.ATK.ToString());
+                View.CharDEFValueText.text(() => CurrentChar.DEF.ToString());
 
-                view.CharLoveLevelValueText.text(() => CurrentChar.LoveLevel.ToString());
-                view.CharLoveBarInnerImage.fillAmount(() => CurrentChar.LoveExpBarFillAmount, view.LoveBarFillAmountTransConfig);
+                View.CharLoveLevelValueText.text(() => CurrentChar.LoveLevel.ToString());
+                View.CharLoveBarInnerImage.fillAmount(() => CurrentChar.LoveExpBarFillAmount, View.LoveBarFillAmountTransConfig);
 
-                view.CharDescText.text(() => CurrentChar.Desc);
+                View.CharDescText.text(() => CurrentChar.Desc);
             });
 
-            view.WeaponTab.ShowIf(() => CurrentTab == TabType.Weapon);
+            View.WeaponTab.ShowIf(() => CurrentTab == TabType.Weapon);
 
-            view.TalentTab.ShowIf(() => CurrentTab == TabType.Talent, () =>
+            View.TalentTab.ShowIf(() => CurrentTab == TabType.Talent, () =>
             {
-                view.TalentItem.RepeatForEachOf(() => CurrentChar.Talents, (int index, TestTalentModel talentModel) =>
+                View.TalentItem.RepeatForEachOf(() => CurrentChar.Talents, (int index, TestTalentModel talentModel) =>
                 {
-                    view.TalentItemNameText.text(() => talentModel.Name);
-                    view.TalentItemLevelText.text(() => $"Lv.{talentModel.Level}");
-                    view.TalentItemIconImage.sprite(() => talentModel.Icon);
+                    View.TalentItemNameText.text(() => talentModel.Name);
+                    View.TalentItemLevelText.text(() => $"Lv.{talentModel.Level}");
+                    View.TalentItemIconImage.sprite(() => talentModel.Icon);
                 });
             });
 
-            view.InfoTab.ShowIf(() => CurrentTab == TabType.Info);
+            View.InfoTab.ShowIf(() => CurrentTab == TabType.Info);
 
-            m_ExpBarFillAmountSharedTransConfig.Value = view.ExpBarFillAmountTransConfig;
+            m_ExpBarFillAmountSharedTransConfig.Value = View.ExpBarFillAmountTransConfig;
         }
 
-        private void BindTopBar(TestComplexPage view)
+        private void BindTopBar()
         {
-            view.CharInfoText.text(() => $"{CurrentChar.ElementType}元素 / {CurrentChar.Name}");
+            View.CharInfoText.text(() => $"{CurrentChar.ElementType}元素 / {CurrentChar.Name}");
 
-            view.CharListItemObj.RepeatForEachOf(() => TestCharDB.Characters, (int index, TestCharacterModel charModel) =>
+            View.CharListItemObj.RepeatForEachOf(() => TestCharDB.Characters, (int index, TestCharacterModel charModel) =>
             {
-                view.CharListItemImage.sprite(() => charModel.Avatar);
-                view.CharListItemButton.onClick(() => CurrentChar = charModel);
+                View.CharListItemImage.sprite(() => charModel.Avatar);
+                View.CharListItemButton.onClick(() => CurrentChar = charModel);
             });
         }
 
-        private void BindTabs(TestComplexPage view)
+        private void BindTabs()
         {
-            view.PropertiesTabToggle
+            View.PropertiesTabToggle
                 .isOn(() => CurrentTab == TabType.Properties)
                 .onValueChanged(value => SwitchTab(value, TabType.Properties));
 
-            view.WeaponTabToggle
+            View.WeaponTabToggle
                 .isOn(() => CurrentTab == TabType.Weapon)
                 .onValueChanged(value => SwitchTab(value, TabType.Weapon));
 
-            view.TalentTabToggle
+            View.TalentTabToggle
                 .isOn(() => CurrentTab == TabType.Talent)
                 .onValueChanged(value => SwitchTab(value, TabType.Talent));
 
-            view.InfoTabToggle
+            View.InfoTabToggle
                 .isOn(() => CurrentTab == TabType.Info)
                 .onValueChanged(value => SwitchTab(value, TabType.Info));
         }
