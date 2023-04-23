@@ -14,7 +14,9 @@ namespace VentiCola.UI
     {
         protected enum BlockerType
         {
-            Blur,
+            StaticBlur,
+            DynmaicBlur,
+            TextureBlur,
             Opaque
         }
 
@@ -31,96 +33,6 @@ namespace VentiCola.UI
             public List<IViewController> WaitingList;
         }
 
-        protected class CameraSettings
-        {
-            public CameraClearFlags ClearFlags;
-            public int CullingMask;
-            public AntialiasingMode Antialiasing;
-            public bool RenderPostProcessing;
-            public bool RenderShadows;
-            public CameraOverrideOption RequiresColorOption;
-            public CameraOverrideOption RequiresDepthOption;
-            public bool Stopped;
-
-            public void StopRenderingIfNot(Camera camera, Camera uiCamera)
-            {
-                if (Stopped)
-                {
-                    return;
-                }
-
-                var urpData = camera.GetUniversalAdditionalCameraData();
-
-                urpData.SetRenderer(2);
-
-                ClearFlags = camera.clearFlags;
-                CullingMask = camera.cullingMask;
-                Antialiasing = urpData.antialiasing;
-                RenderPostProcessing = urpData.renderPostProcessing;
-                RenderShadows = urpData.renderShadows;
-                RequiresColorOption = urpData.requiresColorOption;
-                RequiresDepthOption = urpData.requiresDepthOption;
-
-                camera.clearFlags = CameraClearFlags.Nothing;
-                camera.cullingMask = 0;
-                urpData.antialiasing = AntialiasingMode.None;
-                urpData.renderPostProcessing = false;
-                urpData.renderShadows = false;
-                urpData.requiresColorOption = CameraOverrideOption.Off;
-                urpData.requiresDepthOption = CameraOverrideOption.Off;
-
-                // disable overlay cameras
-                var stack = urpData.cameraStack;
-
-                for (int i = 0; i < stack.Count; i++)
-                {
-                    if (stack[i] == uiCamera)
-                    {
-                        break;
-                    }
-
-                    stack[i].enabled = false;
-                }
-
-                Stopped = true;
-            }
-
-            public void RestartRenderingIfNot(Camera camera, Camera uiCamera)
-            {
-                if (!Stopped)
-                {
-                    return;
-                }
-
-                var urpData = camera.GetUniversalAdditionalCameraData();
-
-                urpData.SetRenderer(0);
-
-                camera.clearFlags = ClearFlags;
-                camera.cullingMask = CullingMask;
-                urpData.antialiasing = Antialiasing;
-                urpData.renderPostProcessing = RenderPostProcessing;
-                urpData.renderShadows = RenderShadows;
-                urpData.requiresColorOption = RequiresColorOption;
-                urpData.requiresDepthOption = RequiresDepthOption;
-
-                // enable overlay cameras
-                var stack = urpData.cameraStack;
-
-                for (int i = 0; i < stack.Count; i++)
-                {
-                    if (stack[i] == uiCamera)
-                    {
-                        break;
-                    }
-
-                    stack[i].enabled = true;
-                }
-
-                Stopped = false;
-            }
-        }
-
         protected readonly Action<string, GameObject> m_LoadPrefabCallback;
         protected readonly Action<IViewController> m_ChangedCallback;
         protected readonly Action<IViewController> m_ClosedCallback;
@@ -131,12 +43,14 @@ namespace VentiCola.UI
         protected readonly Dictionary<string, GameObject> m_PersistentCache;
         protected readonly LRUMultiHashMap<string, GameObject> m_LRUCache;
 
+        private readonly CameraOverrideSettings m_MainCameraFullSettings;
+        private bool m_IsMainCameraRenderingStopped;
+
         protected Transform m_UIRoot;
         protected Transform m_UIPoolRoot;
         protected Camera m_MainCamera;
+        protected UniversalAdditionalCameraData m_MainCameraUrpData;
         protected Camera m_UICamera;
-
-        protected CameraSettings m_MainCameraSettings = new();
 
         protected BaseUIManager()
         {
@@ -151,20 +65,26 @@ namespace VentiCola.UI
             m_LRUCache = new LRUMultiHashMap<string, GameObject>(UIRuntimeSettings.Instance.LRUCacheSize);
             m_LRUCache.OnEliminated += OnLRUPageEliminated;
 
+            m_MainCameraFullSettings = new CameraOverrideSettings();
+            m_IsMainCameraRenderingStopped = false;
+
             InitUIPoolRoot();
             InitUIRootAndCamera();
             InitBuiltinAnimatableTypes();
 
             AdvancedUIRenderer.OnDidRender += frameCountWithoutBlur =>
             {
-                if (m_MainCameraSettings.Stopped || AdvancedUIRenderer.UIChanged)
+                if (m_IsMainCameraRenderingStopped || AdvancedUIRenderer.UIChanged)
                 {
                     return;
                 }
 
                 if (TryGetTopBlockerIfActive(out var blocker) && frameCountWithoutBlur > 10)
                 {
-                    m_MainCameraSettings.StopRenderingIfNot(m_MainCamera, m_UICamera);
+                    if (blocker.Type != BlockerType.TextureBlur)
+                    {
+                        SwitchMainCameraSettings(false);
+                    }
                 }
             };
         }
@@ -174,16 +94,15 @@ namespace VentiCola.UI
             get => m_MainCamera;
             set
             {
-                if (m_MainCamera != null)
+                if (m_MainCameraUrpData != null)
                 {
-                    var prevURPData = m_MainCamera.GetUniversalAdditionalCameraData();
-                    prevURPData.cameraStack.Remove(m_UICamera);
+                    m_MainCameraUrpData.cameraStack.Remove(m_UICamera);
                 }
 
                 m_MainCamera = value;
+                m_MainCameraUrpData = m_MainCamera.GetUniversalAdditionalCameraData();
 
-                var urpData = m_MainCamera.GetUniversalAdditionalCameraData();
-                List<Camera> cameraStack = urpData.cameraStack;
+                List<Camera> cameraStack = m_MainCameraUrpData.cameraStack;
 
                 if (!cameraStack.Contains(m_UICamera))
                 {
@@ -252,6 +171,8 @@ namespace VentiCola.UI
             MakeAnimatable<Vector4>(Vector4.LerpUnclamped);
             MakeAnimatable<Color>(Color.LerpUnclamped);
         }
+
+        public void PrepareEnvironment() { } // empty method
 
         public void ShowSingleton<T>() where T : class, IViewController, new()
         {
@@ -338,8 +259,10 @@ namespace VentiCola.UI
                     StackIndex = stackIndex,
                     Type = controller.Config.RenderOption switch
                     {
-                        UIRenderOption.FullScreenBlur => BlockerType.Blur,
+                        UIRenderOption.FullScreenStaticBlur => BlockerType.StaticBlur,
+                        UIRenderOption.FullScreenDynamicBlur => BlockerType.DynmaicBlur,
                         UIRenderOption.FullScreenOpaque => BlockerType.Opaque,
+                        UIRenderOption.DynamicBlurToTexture => BlockerType.TextureBlur,
                         _ => throw new NotImplementedException()
                     },
                 });
@@ -397,10 +320,100 @@ namespace VentiCola.UI
 
         protected void UpdateRenderer()
         {
-            AdvancedUIRenderer.UseBlur = TryGetTopBlockerIfActive(out BlockerInfo blocker)
-                && (blocker.Type == BlockerType.Blur);
+            if (!TryGetTopBlockerIfActive(out BlockerInfo blocker))
+            {
+                AdvancedUIRenderer.BlurOpt = BlurOption.Disable;
+            }
+            else
+            {
+                AdvancedUIRenderer.BlurOpt = blocker.Type switch
+                {
+                    BlockerType.StaticBlur => BlurOption.FullScreenStatic,
+                    BlockerType.DynmaicBlur => BlurOption.FullScreenDynamic,
+                    BlockerType.TextureBlur => BlurOption.TextureDynamic,
+                    _ => BlurOption.Disable,
+                };
+            }
+
             AdvancedUIRenderer.UIChanged = true;
-            m_MainCameraSettings.RestartRenderingIfNot(m_MainCamera, m_UICamera);
+
+            SwitchMainCameraSettings(true);
+
+            // Debug.LogFormat("Blocker Count: {0}", m_BlockerStack.Count);
+        }
+
+        protected void SwitchMainCameraSettings(bool full)
+        {
+            if (m_IsMainCameraRenderingStopped != full)
+            {
+                // 已经满足要求了
+                return;
+            }
+
+            var settings = UIRuntimeSettings.Instance;
+
+            if (full)
+            {
+                if (settings.EnableMainCameraOverrideSettings)
+                {
+                    m_MainCameraFullSettings.ApplyTo(m_MainCamera, m_MainCameraUrpData);
+
+                    // 启用 UI 相机前面的堆叠摄像机
+                    List<Camera> cameraStack = m_MainCameraUrpData.cameraStack;
+
+                    for (int i = 0; i < cameraStack.Count; i++)
+                    {
+                        var camera = cameraStack[i];
+
+                        if (camera == m_UICamera)
+                        {
+                            break;
+                        }
+
+                        camera.enabled = true;
+                    }
+                }
+
+                if (settings.EnableMainCameraRendererSettings)
+                {
+                    m_MainCameraUrpData.SetRenderer(settings.MainCameraRendererSettings.FullFeature);
+                }
+
+                m_IsMainCameraRenderingStopped = false;
+            }
+            else
+            {
+                // TODO: 再想想，真的吗？
+                // 每次都拷贝，防止 EnableMainCameraOverrideSettings 突然变化后 Camera 设置混乱
+                m_MainCameraFullSettings.CopyFrom(m_MainCamera, m_MainCameraUrpData);
+
+                if (settings.EnableMainCameraOverrideSettings)
+                {
+                    settings.MainCameraOverrideSettings.ApplyTo(m_MainCamera, m_MainCameraUrpData);
+
+                    // 禁用 UI 相机前面的堆叠摄像机
+                    List<Camera> cameraStack = m_MainCameraUrpData.cameraStack;
+
+                    for (int i = 0; i < cameraStack.Count; i++)
+                    {
+                        var camera = cameraStack[i];
+
+                        if (camera == m_UICamera)
+                        {
+                            break;
+                        }
+
+                        camera.enabled = false;
+                    }
+                }
+
+                if (settings.EnableMainCameraRendererSettings)
+                {
+                    m_MainCameraUrpData.SetRenderer(settings.MainCameraRendererSettings.LightWeight);
+                }
+
+                m_IsMainCameraRenderingStopped = true;
+            }
         }
 
         protected virtual void OnLoadPrefabCompleted(string prefabKey, GameObject prefab)
@@ -500,6 +513,8 @@ namespace VentiCola.UI
             {
                 CloseLast();
             }
+
+            UpdateRenderer();
         }
 
         public void Close(IViewController controller)

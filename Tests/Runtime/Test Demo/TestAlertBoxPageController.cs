@@ -33,8 +33,26 @@ namespace VentiColaTests.UI
         public TestAlertBoxPageController()
         {
             Config.PrefabKey = "Test Alert Box";
-            Config.RenderOption = UIRenderOption.FullScreenBlur;
+            Config.RenderOption = UIRenderOption.FullScreenStaticBlur;
             Config.IsAdditive = true;
+        }
+
+        protected override void OnViewDidLoad()
+        {
+            View.OnClickHandler = e =>
+            {
+                if (e.rawPointerPress != View.gameObject)
+                {
+                    return;
+                }
+
+                Singleton<ResourcesUIManager>.Instance.Close(this);
+            };
+        }
+
+        protected override void OnViewWillUnload()
+        {
+            View.OnClickHandler = null;
         }
 
         protected override void OnViewAppear()
@@ -62,13 +80,13 @@ namespace VentiColaTests.UI
             View.ConfirmButton.onClick(() =>
             {
                 OnConfirm?.Invoke();
-                Test.UIManager.Close(this);
+                Singleton<ResourcesUIManager>.Instance.Close(this);
             });
 
             View.CancelButton.onClick(() =>
             {
                 OnCancel?.Invoke();
-                Test.UIManager.Close(this);
+                Singleton<ResourcesUIManager>.Instance.Close(this);
             });
         }
     }

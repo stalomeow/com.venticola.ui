@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Rendering.Universal;
 using VentiCola.UI;
 using VentiColaEditor.UI.Settings;
 using Object = UnityEngine.Object;
@@ -15,7 +16,10 @@ namespace VentiColaEditor.UI.CustomEditors
         private SerializedProperty m_LRUCacheSize;
         private SerializedProperty m_UIRootPrefab;
         private SerializedProperty m_Shaders;
-        private SerializedProperty m_MainCameraInactiveSettings;
+        private SerializedProperty m_EnableMainCameraOverrideSettings;
+        private SerializedProperty m_EnableMainCameraRendererSettings;
+        private SerializedProperty m_MainCameraOverrideSettings;
+        private SerializedProperty m_MainCameraRendererSettings;
         private SerializedProperty m_AdditionalData;
         private Editor m_AdditionalDataEditor;
 
@@ -67,25 +71,10 @@ namespace VentiColaEditor.UI.CustomEditors
             DrawGeneralSettings();
 
             EditorGUILayout.Space();
+            DrawMainCameraOverrides();
 
-            EditorGUILayout.LabelField("Main Camera", EditorStyles.boldLabel);
-
-            using (new EditorGUI.IndentLevelScope())
-            {
-                EditorGUILayout.HelpBox("If a UI covers the entire screen, these settings will be temporarily applied to the Main Camera to reduce overdraw.", MessageType.Info);
-
-                SerializedProperty settings = m_MainCameraInactiveSettings.Copy();
-
-                while (settings.NextVisible(true))
-                {
-                    if (!settings.propertyPath.StartsWith($"{nameof(m_MainCameraInactiveSettings)}."))
-                    {
-                        break;
-                    }
-
-                    EditorGUILayout.PropertyField(settings);
-                }
-            }
+            EditorGUILayout.Space();
+            DrawMainCameraRenderers();
 
             EditorGUILayout.Space();
             DrawShadersSettings();
@@ -125,28 +114,45 @@ namespace VentiColaEditor.UI.CustomEditors
 
                 if (uiRoot == null)
                 {
-                    EditorGUILayout.HelpBox("UIRoot is None.", MessageType.Error);
+                    EditorGUILayout.HelpBox("UIRoot can not be None.", MessageType.Error);
                 }
                 else
                 {
-                    int activeCanvasCount = uiRoot.GetComponentsInChildren<Canvas>(false).Length;
-                    int activeEventSystemCount = uiRoot.GetComponentsInChildren<EventSystem>(false).Length;
+                    int passedCheckCount = 0;
+                    Canvas[] activeCanvases = uiRoot.GetComponentsInChildren<Canvas>(false);
+                    EventSystem[] activeEventSystems = uiRoot.GetComponentsInChildren<EventSystem>(false);
 
-                    if (activeCanvasCount == 0)
+                    if (activeCanvases.Length == 0)
                     {
                         EditorGUILayout.HelpBox("No active Canvas in the UIRoot.", MessageType.Error);
                     }
-                    else if (activeCanvasCount > 1)
+                    else if (activeCanvases.Length > 1)
                     {
-                        EditorGUILayout.HelpBox("Multiple active Canvases in the UIRoot.", MessageType.Warning);
+                        EditorGUILayout.HelpBox("Multiple active Canvases in the UIRoot.", MessageType.Error);
+                    }
+                    else if (activeCanvases[0].renderMode != RenderMode.ScreenSpaceCamera)
+                    {
+                        EditorGUILayout.HelpBox("The RenderMode of Canvas should be ScreenSpaceCamera.", MessageType.Error);
+                    }
+                    else
+                    {
+                        passedCheckCount++;
                     }
 
-                    if (activeEventSystemCount == 0)
+                    if (activeEventSystems.Length == 0)
                     {
                         EditorGUILayout.HelpBox("No active EventSystem in the UIRoot.", MessageType.Warning);
                     }
+                    else if (activeEventSystems.Length > 1)
+                    {
+                        EditorGUILayout.HelpBox("Multiple active EventSystems in the UIRoot.", MessageType.Warning);
+                    }
+                    else
+                    {
+                        passedCheckCount++;
+                    }
 
-                    if (activeCanvasCount > 0 && activeEventSystemCount > 0)
+                    if (passedCheckCount == 2)
                     {
                         Rect rect = EditorGUILayout.GetControlRect();
                         rect.xMin += EditorGUIUtility.labelWidth + 2f;
@@ -199,6 +205,100 @@ namespace VentiColaEditor.UI.CustomEditors
             }
 
             EditorSceneManager.UnloadSceneAsync(scene);
+        }
+
+        private void DrawMainCameraOverrides()
+        {
+            EditorGUILayout.LabelField("Main Camera Overrides", EditorStyles.boldLabel);
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.PropertyField(m_EnableMainCameraOverrideSettings, EditorGUIUtility.TrTextContent("Enable"));
+                EditorGUILayout.HelpBox("If enabled, these settings will be temporarily applied to the Main Camera to reduce overdraw when a UI covers the entire screen.", MessageType.Info);
+
+                using (new EditorGUI.DisabledScope(!m_EnableMainCameraOverrideSettings.boolValue))
+                {
+                    SerializedProperty settings = m_MainCameraOverrideSettings.Copy();
+
+                    while (settings.NextVisible(true))
+                    {
+                        if (!settings.propertyPath.StartsWith($"{nameof(m_MainCameraOverrideSettings)}."))
+                        {
+                            break;
+                        }
+
+                        EditorGUILayout.PropertyField(settings);
+                    }
+                }
+            }
+        }
+
+        private void DrawMainCameraRenderers()
+        {
+            EditorGUILayout.LabelField("Main Camera Renderers", EditorStyles.boldLabel);
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.PropertyField(m_EnableMainCameraRendererSettings, EditorGUIUtility.TrTextContent("Enable"));
+                EditorGUILayout.HelpBox("If enabled, the Light Weight Renderer will be temporarily applied to Main Camera to improve performance when a UI covers the entire screen.", MessageType.Info);
+
+                using (new EditorGUI.DisabledScope(!m_EnableMainCameraRendererSettings.boolValue))
+                {
+                    SerializedProperty settings = m_MainCameraRendererSettings.Copy();
+
+                    var asset = UniversalRenderPipeline.asset;
+                    var defaultRendererIndex = (int)asset.GetType().GetField("m_DefaultRendererIndex", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(asset);
+                    var renderers = (ScriptableRendererData[])asset.GetType().GetField("m_RendererDataList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(asset);
+
+                    while (settings.NextVisible(true))
+                    {
+                        if (!settings.propertyPath.StartsWith($"{nameof(m_MainCameraRendererSettings)}."))
+                        {
+                            break;
+                        }
+
+                        Rect rect = EditorGUILayout.GetControlRect(true);
+                        rect = EditorGUI.PrefixLabel(rect, EditorGUIUtility.TrTextContent(settings.displayName));
+
+                        int selectedIndex = settings.intValue;
+                        GUIContent popupLabel = GetRendererDisplayName(renderers, selectedIndex, defaultRendererIndex);
+
+                        if (EditorGUI.DropdownButton(rect, popupLabel, FocusType.Keyboard, EditorStyles.popup))
+                        {
+                            var menu = new GenericMenu();
+                            var propPath = settings.propertyPath;
+
+                            menu.AddItem(GetRendererDisplayName(renderers, -1, defaultRendererIndex), selectedIndex == -1, () =>
+                            {
+                                serializedObject.FindProperty(propPath).intValue = -1;
+                                serializedObject.ApplyModifiedProperties();
+                            });
+
+                            for (int i = 0; i < renderers.Length; i++)
+                            {
+                                int index = i;
+                                menu.AddItem(GetRendererDisplayName(renderers, i, defaultRendererIndex), selectedIndex == i, () =>
+                                {
+                                    serializedObject.FindProperty(propPath).intValue = index;
+                                    serializedObject.ApplyModifiedProperties();
+                                });
+                            }
+
+                            menu.DropDown(rect);
+                        }
+                    }
+                }
+            }
+
+            static GUIContent GetRendererDisplayName(ScriptableRendererData[] renderers, int index, int defaultIndex)
+            {
+                if (index == -1)
+                {
+                    return EditorGUIUtility.TrTextContent($"Default Renderer ({renderers[defaultIndex].name})");
+                }
+
+                return EditorGUIUtility.TrTextContent($"{index}: {renderers[index].name}");
+            }
         }
 
         private void DrawShadersSettings()

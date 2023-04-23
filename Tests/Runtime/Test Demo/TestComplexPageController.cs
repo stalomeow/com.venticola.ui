@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using VentiCola.UI;
 using VentiCola.UI.Bindings;
+using VentiCola.UI.Bindings.Experimental;
 
 namespace VentiColaTests.UI
 {
@@ -25,9 +26,8 @@ namespace VentiColaTests.UI
 
         private void OnDrag(PointerEventData eventData)
         {
-            Debug.Log($"Drag: {eventData.delta.x}");
-            //Transform character = GameObject.Find("ying_with_physics").transform;
-            //character.Rotate(new Vector3(0, eventData.delta.x * -0.5f, 0));
+            Transform character = GameObject.Find("ying_with_physics").transform;
+            character.Rotate(new Vector3(0, eventData.delta.x * -0.5f, 0));
         }
 
         private void SwitchTab(bool value, TabType tab)
@@ -40,52 +40,93 @@ namespace VentiColaTests.UI
             CurrentTab = tab;
             Debug.Log(tab);
 
-            //var go = GameObject.Find("ying_with_physics");
-            //var animator = go.GetComponent<Animator>();
-            //var renderer = go.GetComponentInChildren<SkinnedMeshRenderer>();
+            var go = GameObject.Find("ying_with_physics");
+            var animator = go.GetComponent<Animator>();
+            var renderer = go.GetComponentInChildren<SkinnedMeshRenderer>();
 
-            //if (tab == TabType.Properties)
-            //{
-            //    animator.SetInteger("animBaseInt", 7);
-            //    renderer.SetBlendShapeWeight(16, 100);
-            //    renderer.SetBlendShapeWeight(25, 100);
-            //}
-            //else
-            //{
-            //    renderer.SetBlendShapeWeight(16, 0);
-            //    renderer.SetBlendShapeWeight(25, 0);
-            //}
+            if (tab == TabType.Properties)
+            {
+                animator.SetInteger("animBaseInt", 7);
+                renderer.SetBlendShapeWeight(16, 100);
+                renderer.SetBlendShapeWeight(25, 100);
+            }
+            else
+            {
+                renderer.SetBlendShapeWeight(16, 0);
+                renderer.SetBlendShapeWeight(25, 0);
+            }
 
-            //if (tab == TabType.Talent)
-            //{
-            //    animator.SetInteger("animBaseInt", 5);
-            //}
+            if (tab == TabType.Talent)
+            {
+                animator.SetInteger("animBaseInt", 5);
+            }
 
-            //if (tab == TabType.Weapon)
-            //{
-            //    animator.SetInteger("animBaseInt", 3);
-            //    renderer.SetBlendShapeWeight(33, 40);
-            //    renderer.SetBlendShapeWeight(41, 100);
-            //}
-            //else
-            //{
-            //    renderer.SetBlendShapeWeight(33, 0);
-            //    renderer.SetBlendShapeWeight(41, 0);
-            //}
+            if (tab == TabType.Weapon)
+            {
+                animator.SetInteger("animBaseInt", 3);
+                renderer.SetBlendShapeWeight(33, 40);
+                renderer.SetBlendShapeWeight(41, 100);
+            }
+            else
+            {
+                renderer.SetBlendShapeWeight(33, 0);
+                renderer.SetBlendShapeWeight(41, 0);
+            }
 
-            //if (tab == TabType.Info)
-            //{
-            //    animator.SetInteger("animBaseInt", 2);
-            //    renderer.SetBlendShapeWeight(3, 100);
-            //    renderer.SetBlendShapeWeight(30, 100);
-            //    renderer.SetBlendShapeWeight(40, 100);
-            //}
-            //else
-            //{
-            //    renderer.SetBlendShapeWeight(3, 0);
-            //    renderer.SetBlendShapeWeight(30, 0);
-            //    renderer.SetBlendShapeWeight(40, 0);
-            //}
+            if (tab == TabType.Info)
+            {
+                animator.SetInteger("animBaseInt", 2);
+                renderer.SetBlendShapeWeight(3, 100);
+                renderer.SetBlendShapeWeight(30, 100);
+                renderer.SetBlendShapeWeight(40, 100);
+            }
+            else
+            {
+                renderer.SetBlendShapeWeight(3, 0);
+                renderer.SetBlendShapeWeight(30, 0);
+                renderer.SetBlendShapeWeight(40, 0);
+            }
+        }
+
+        protected override void OnViewDidLoad()
+        {
+            Rect safeArea = Screen.safeArea;
+            Vector2 tempPos;
+
+            tempPos = View.CharInfoText.GetComponent<RectTransform>().anchoredPosition;
+            tempPos.x = Mathf.Max(safeArea.x, tempPos.x);
+            View.CharInfoText.GetComponent<RectTransform>().anchoredPosition = tempPos;
+
+            tempPos = View.CloseButton.GetComponent<RectTransform>().anchoredPosition;
+            tempPos.x = Mathf.Min(-safeArea.x, tempPos.x);
+            View.CloseButton.GetComponent<RectTransform>().anchoredPosition = tempPos;
+
+            tempPos = View.TabTogglePanel.GetComponent<RectTransform>().anchoredPosition;
+            tempPos.x = Mathf.Max(safeArea.x, tempPos.x);
+            View.TabTogglePanel.GetComponent<RectTransform>().anchoredPosition = tempPos;
+
+            tempPos = View.PropertiesTab.GetComponent<RectTransform>().anchoredPosition;
+            tempPos.x = Mathf.Min(-safeArea.x, tempPos.x);
+            View.PropertiesTab.GetComponent<RectTransform>().anchoredPosition = tempPos;
+
+            tempPos = View.WeaponTab.GetComponent<RectTransform>().anchoredPosition;
+            tempPos.x = Mathf.Min(-safeArea.x, tempPos.x);
+            View.WeaponTab.GetComponent<RectTransform>().anchoredPosition = tempPos;
+
+            tempPos = View.TalentTab.GetComponent<RectTransform>().anchoredPosition;
+            tempPos.x = Mathf.Min(-safeArea.x, tempPos.x);
+            View.TalentTab.GetComponent<RectTransform>().anchoredPosition = tempPos;
+
+            tempPos = View.InfoTab.GetComponent<RectTransform>().anchoredPosition;
+            tempPos.x = Mathf.Min(-safeArea.x, tempPos.x);
+            View.InfoTab.GetComponent<RectTransform>().anchoredPosition = tempPos;
+
+            View.OnDragHandler = OnDrag;
+        }
+
+        protected override void OnViewWillUnload()
+        {
+            View.OnDragHandler = null;
         }
 
         protected override void OnViewAppear()
@@ -106,7 +147,7 @@ namespace VentiColaTests.UI
             BindTabs();
 
             View.PageCanvasGroup.alpha(() => PageAlpha, in View.PageAlphaTransConfig);
-            View.CloseButton.onClick(() => Test.UIManager.Close(this));
+            View.CloseButton.onClick(() => Singleton<ResourcesUIManager>.Instance.Close(this));
 
             View.PropertiesTab.ShowIf(() => CurrentTab == TabType.Properties, () =>
             {

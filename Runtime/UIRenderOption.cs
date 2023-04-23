@@ -4,6 +4,8 @@ namespace VentiCola.UI
     {
         None = 0,
         FullScreenOpaque = 1,
-        FullScreenBlur = 2
+        FullScreenStaticBlur = 2,
+        FullScreenDynamicBlur = 3,
+        DynamicBlurToTexture = 4,
     }
 }

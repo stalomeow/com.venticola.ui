@@ -64,6 +64,7 @@ namespace VentiCola.UI
             m_State = UIState.Active;
             m_StackIndex = stackIndex;
             m_View.UpdateCanvas(stackIndex);
+            m_View.UpdateCanvasGroup(true);
 
             OnOpen();
         }
@@ -71,6 +72,7 @@ namespace VentiCola.UI
         void IViewController.Pause()
         {
             m_State = UIState.Paused;
+            m_View.UpdateCanvasGroup(false);
 
             OnPause();
         }
@@ -78,6 +80,7 @@ namespace VentiCola.UI
         void IViewController.Resume()
         {
             m_State = UIState.Active;
+            m_View.UpdateCanvasGroup(true);
 
             OnResume();
         }
@@ -85,6 +88,7 @@ namespace VentiCola.UI
         void IViewController.Close()
         {
             m_State = UIState.Closing;
+            m_View.UpdateCanvasGroup(false);
 
             OnClose();
         }
@@ -173,6 +177,8 @@ namespace VentiCola.UI
         {
             m_State = UIState.Closed;
 
+            OnViewWillUnload();
+
             if (m_ClosingCompletedCallback is not null)
             {
                 m_ClosingCompletedCallback(this);
@@ -193,8 +199,6 @@ namespace VentiCola.UI
                 m_ViewBindingRoot.Dispose();
                 m_ViewBindingRoot = null;
             }
-
-            OnViewDidUnload();
         }
 
         private void UpdateBindings()
@@ -294,7 +298,7 @@ namespace VentiCola.UI
         /// <summary>
         /// 在这里释放资源，不能再使用 View 了
         /// </summary>
-        protected virtual void OnViewDidUnload() { }
+        protected virtual void OnViewWillUnload() { }
 
         protected virtual void OnUpdate() { }
 

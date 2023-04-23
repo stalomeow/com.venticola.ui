@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using UnityEngine;
 using VentiCola.UI.Rendering;
 
@@ -23,11 +22,11 @@ namespace VentiCola.UI
         [Serializable]
         public class ShaderResources
         {
-            [DefaultShader("Packages/com.venticola.ui/Shaders/GaussianBlur5x5.shader")]
-            public Shader GaussianBlur5x5;
+            [DefaultShader("Packages/com.venticola.ui/Shaders/BlurBackground.shader")]
+            public Shader BlurBackground;
 
-            [DefaultShader("Packages/com.venticola.ui/Shaders/GaussianBlur5x5.shader")]
-            public Shader GaussianBlur3x3;
+            [DefaultShader("Packages/com.venticola.ui/Shaders/GaussianBlur.shader")]
+            public Shader GaussianBlur;
 
             public Shader BoxBlur;
 
@@ -41,7 +40,10 @@ namespace VentiCola.UI
         [SerializeField, Min(3)] private int m_LRUCacheSize = 5;
         [SerializeField] private GameObject m_UIRootPrefab;
         [SerializeField] private ShaderResources m_Shaders;
-        [SerializeField] private CameraOverrideSettings m_MainCameraInactiveSettings;
+        [SerializeField] private bool m_EnableMainCameraOverrideSettings = true;
+        [SerializeField] private bool m_EnableMainCameraRendererSettings = true;
+        [SerializeField] private CameraOverrideSettings m_MainCameraOverrideSettings;
+        [SerializeField] private CameraRendererSettings m_MainCameraRendererSettings;
         [SerializeField] private ScriptableObject m_AdditionalData;
 
         public int LRUCacheSize => m_LRUCacheSize;
@@ -50,7 +52,13 @@ namespace VentiCola.UI
 
         public ShaderResources DefaultShaders => m_Shaders;
 
-        public CameraOverrideSettings MainCameraInactiveSettings => m_MainCameraInactiveSettings;
+        public bool EnableMainCameraOverrideSettings => m_EnableMainCameraOverrideSettings;
+
+        public bool EnableMainCameraRendererSettings => m_EnableMainCameraRendererSettings;
+
+        public CameraOverrideSettings MainCameraOverrideSettings => m_MainCameraOverrideSettings;
+
+        public CameraRendererSettings MainCameraRendererSettings => m_MainCameraRendererSettings;
 
         public T GetAdditionalData<T>() where T : ScriptableObject
         {
@@ -112,9 +120,10 @@ namespace VentiCola.UI
             }
         }
 
-        [Conditional("UNITY_EDITOR")]
+#if UNITY_EDITOR
         internal static void SetInstance(UIRuntimeSettings settings)
         {
+
             if (settings == null)
             {
                 EditorBuildSettings.RemoveConfigObject(k_ConfigName);
@@ -124,5 +133,6 @@ namespace VentiCola.UI
                 EditorBuildSettings.AddConfigObject(k_ConfigName, settings, true);
             }
         }
+#endif
     }
 }

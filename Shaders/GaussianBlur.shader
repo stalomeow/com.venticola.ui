@@ -1,4 +1,4 @@
-Shader "VentiCola/UI/Gaussian Blur 5x5"
+Shader "VentiCola/Effects/Gaussian Blur"
 {
     Properties
     {
@@ -11,7 +11,7 @@ Shader "VentiCola/UI/Gaussian Blur 5x5"
         {
             "Queue" = "Transparent"
             "RenderType" = "Transparent"
-            "IgnoreProjector" = "true"
+            "IgnoreProjector" = "True"
             "RenderPipeline" = "UniversalPipeline"
         }
 

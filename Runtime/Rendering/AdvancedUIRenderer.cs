@@ -4,35 +4,13 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using VentiCola.UI.Internal;
+using static VentiCola.UI.Rendering.BlurUtility;
 
 namespace VentiCola.UI.Rendering
 {
     [DisallowMultipleRendererFeature]
     public class AdvancedUIRenderer : ScriptableRendererFeature
     {
-        private enum DownsamplingType
-        {
-            None = 0,
-            _2x = 2,
-            _4x = 4,
-            _8x = 8,
-            _16x = 16
-        }
-
-        [Serializable]
-        private class BlurSettings
-        {
-            public BlurAlgorithm Algorithm = BlurAlgorithm.Gaussian5x5Kernel;
-            public DownsamplingType Downsampling = DownsamplingType._4x;
-            public FilterMode FilterMode = FilterMode.Bilinear;
-
-            [Range(1, 10)]
-            public int Iterations = 3;
-
-            [Range(0.2f, 3.0f)]
-            public float Spread = 0.5f;
-        }
-
         private static AdvancedUIRenderer s_Instance;
 
         [SerializeField] private BlurSettings m_Blur = new();
@@ -42,7 +20,7 @@ namespace VentiCola.UI.Rendering
 
         public static bool UIChanged { get; set; }
 
-        public static bool UseBlur { get; set; }
+        public static BlurOption BlurOpt { get; set; }
 
         public static int TopLayer => s_Instance.m_TopUILayer;
 
@@ -110,12 +88,8 @@ namespace VentiCola.UI.Rendering
         // This method is called when setting up the renderer once per-camera.
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
-            if (UseBlur && UIChanged)
-            {
-                m_ScriptablePass.ExecuteBlur = 1; // 防止 main camera 没开启
-            }
-
-            m_ScriptablePass.HasBlur = UseBlur;
+            m_ScriptablePass.UIChanged = UIChanged;
+            m_ScriptablePass.BlurOpt = BlurOpt; // 防止 main camera 没开启
             renderer.EnqueuePass(m_ScriptablePass);
             UIChanged = false;
         }
@@ -126,8 +100,7 @@ namespace VentiCola.UI.Rendering
 
             return m_Blur.Algorithm switch
             {
-                BlurAlgorithm.Gaussian5x5Kernel => shaders.GaussianBlur5x5,
-                BlurAlgorithm.Gaussian3x3Kernel => shaders.GaussianBlur3x3,
+                BlurAlgorithm.Gaussian => shaders.GaussianBlur,
                 BlurAlgorithm.Box => shaders.BoxBlur,
                 BlurAlgorithm.Kawase => shaders.KawaseBlur,
                 BlurAlgorithm.Dual => shaders.DualBlur,
@@ -137,13 +110,6 @@ namespace VentiCola.UI.Rendering
 
         private class CustomRenderPass : ScriptableRenderPass
         {
-            // Precomputed shader ids to save some CPU cycles (mostly affects mobile)
-            private static class ShaderConstants
-            {
-                public static readonly int _TempBlurTex = Shader.PropertyToID("_TempBlurTex");
-                public static readonly int _GaussianBlurSize = Shader.PropertyToID("_GaussianBlurSize");
-            }
-
             private readonly ProfilingSampler m_FullRenderWithBlurProfilingSampler = new("Full UI Rendering With Blur");
             private readonly List<ShaderTagId> m_ShaderTagIdList = new()
             {
@@ -157,21 +123,18 @@ namespace VentiCola.UI.Rendering
             public int TopUILayerMask;
             public int UILayerMask;
 
-            public int ExecuteBlur;
-            public bool HasBlur;
+            public bool UIChanged;
+            public BlurOption BlurOpt;
 
             public RenderTexture BlurDestination;
             private int m_FrameCountWithoutBlur;
 
             public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
             {
-                if (ExecuteBlur == 0)
+                if (BlurOpt == BlurOption.Disable)
                 {
-                    m_FrameCountWithoutBlur++;
                     return;
                 }
-
-                m_FrameCountWithoutBlur = 0;
 
                 RenderTextureDescriptor descriptor = renderingData.cameraData.cameraTargetDescriptor; // copy the value
 
@@ -188,18 +151,28 @@ namespace VentiCola.UI.Rendering
                 }
 
                 UpdateBlurDestination(in descriptor);
-                cmd.GetTemporaryRT(ShaderConstants._TempBlurTex, descriptor, Blur.FilterMode);
+                cmd.GetTemporaryRT(ShaderConstants._TempBlurTexture, descriptor, Blur.FilterMode);
             }
 
             private void UpdateBlurDestination(in RenderTextureDescriptor descriptor)
             {
+                int? lastInstanceID = null;
+
                 if (BlurDestination != null)
                 {
+                    lastInstanceID = BlurDestination.GetInstanceID();
                     RenderTexture.ReleaseTemporary(BlurDestination);
                 }
 
                 BlurDestination = RenderTexture.GetTemporary(descriptor);
                 BlurDestination.filterMode = Blur.FilterMode;
+                Shader.SetGlobalTexture(ShaderConstants._UIBlurTexture, BlurDestination);
+
+                if (BlurDestination.GetInstanceID() != lastInstanceID)
+                {
+                    UIChanged = true; // 屏幕分辨率等设置发生变化
+                    Debug.LogWarning("NEW Blur RT");
+                }
             }
 
             public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
@@ -214,22 +187,39 @@ namespace VentiCola.UI.Rendering
                 // In this case, it is recommended to activate the dest render target explicitly with the appropriate load and store actions using SetRenderTarget.
                 // The Blit dest should then be set to BuiltinRenderTextureType.CurrentActive.
 
-                if (ExecuteBlur > 0)
+                switch (BlurOpt)
                 {
-                    ExecuteBlur--;
-                    DoFullRenderWithBlur(ref context, ref renderingData);
-                }
-                else if (HasBlur)
-                {
-                    DoFastRenderWithBlur(ref context, ref renderingData);
-                }
-                else
-                {
-                    DoFastRenderWithoutBlur(ref context, ref renderingData);
+                    case BlurOption.Disable:
+                        DoFastRenderWithoutBlur(ref context, ref renderingData);
+                        m_FrameCountWithoutBlur++;
+                        break;
+
+                    case BlurOption.FullScreenStatic when UIChanged:
+                        goto case BlurOption.FullScreenDynamic;
+
+                    case BlurOption.FullScreenStatic:
+                        DoFastRenderWithCachedBlurTex(ref context, ref renderingData);
+                        m_FrameCountWithoutBlur++; // 实际上没有执行 Blur
+                        break;
+
+                    case BlurOption.FullScreenDynamic:
+                        DoFullRenderWithBlur(ref context, ref renderingData, true);
+                        m_FrameCountWithoutBlur = 0;
+                        break;
+
+                    case BlurOption.TextureDynamic:
+                        DoFullRenderWithBlur(ref context, ref renderingData, false);
+                        m_FrameCountWithoutBlur = 0;
+                        break;
+
+                    default:
+                        Debug.LogErrorFormat("Unknown blur option: {0}.", BlurOpt.ToString());
+                        m_FrameCountWithoutBlur++;
+                        break;
                 }
             }
 
-            private void DoFullRenderWithBlur(ref ScriptableRenderContext context, ref RenderingData renderingData)
+            private void DoFullRenderWithBlur(ref ScriptableRenderContext context, ref RenderingData renderingData, bool renderBlurLayer)
             {
                 RenderTargetIdentifier cameraTarget = renderingData.cameraData.renderer.cameraColorTarget;
                 RenderTargetIdentifier blurTarget = BlurDestination;
@@ -241,7 +231,13 @@ namespace VentiCola.UI.Rendering
                 using (new ProfilingScope(cmd, m_FullRenderWithBlurProfilingSampler))
                 {
                     // first render ui
+                    cmd.DisableKeyword(in ShaderConstants.VENTI_COLA_ENABLE_UI_BLUR);
+                    context.ExecuteCommandBuffer(cmd);
+                    cmd.Clear();
+
                     RenderUI(context, ref renderingData, UILayerMask);
+
+                    cmd.EnableKeyword(in ShaderConstants.VENTI_COLA_ENABLE_UI_BLUR);
 
                     // downsampling
                     cmd.SetRenderTarget(blurTarget,
@@ -252,8 +248,8 @@ namespace VentiCola.UI.Rendering
                     // execute blur
                     switch (Blur.Algorithm)
                     {
-                        case BlurAlgorithm.Gaussian5x5Kernel:
-                            GaussianBlur(cmd, in blurTarget);
+                        case BlurAlgorithm.Gaussian:
+                            GaussianBlur(Blur, BlurMaterial, cmd, in blurTarget);
                             break;
                     }
 
@@ -262,8 +258,11 @@ namespace VentiCola.UI.Rendering
                         RenderBufferLoadAction.Load, RenderBufferStoreAction.Store,  // color
                         RenderBufferLoadAction.Load, RenderBufferStoreAction.Store); // depth
 
-                    // render the blur layer
-                    cmd.Blit(blurTarget, BuiltinRenderTextureType.CurrentActive);
+                    if (renderBlurLayer)
+                    {
+                        // render the blur layer
+                        cmd.Blit(blurTarget, BuiltinRenderTextureType.CurrentActive);
+                    }
 
                     // execute before rendering top UI
                     context.ExecuteCommandBuffer(cmd);
@@ -277,7 +276,7 @@ namespace VentiCola.UI.Rendering
                 CommandBufferPool.Release(cmd);
             }
 
-            private void DoFastRenderWithBlur(ref ScriptableRenderContext context, ref RenderingData renderingData)
+            private void DoFastRenderWithCachedBlurTex(ref ScriptableRenderContext context, ref RenderingData renderingData)
             {
                 RenderTargetIdentifier blurTarget = BlurDestination;
 
@@ -304,43 +303,22 @@ namespace VentiCola.UI.Rendering
 
             private void DoFastRenderWithoutBlur(ref ScriptableRenderContext context, ref RenderingData renderingData)
             {
-                using (new ProfilingScope(null, m_FullRenderWithBlurProfilingSampler))
+                // NOTE: Do NOT mix ProfilingScope with named CommandBuffers i.e. CommandBufferPool.Get("name").
+                // Currently there's an issue which results in mismatched markers.
+                CommandBuffer cmd = CommandBufferPool.Get();
+
+                using (new ProfilingScope(cmd, m_FullRenderWithBlurProfilingSampler))
                 {
+                    cmd.DisableKeyword(in ShaderConstants.VENTI_COLA_ENABLE_UI_BLUR);
+                    context.ExecuteCommandBuffer(cmd);
+                    cmd.Clear();
+
                     // render top UI only
                     RenderUI(context, ref renderingData, TopUILayerMask);
                 }
-            }
 
-            public override void OnCameraCleanup(CommandBuffer cmd)
-            {
-                OnDidRender?.Invoke(m_FrameCountWithoutBlur);
-
-                if (ExecuteBlur == 0)
-                {
-                    return;
-                }
-
-                cmd.ReleaseTemporaryRT(ShaderConstants._TempBlurTex);
-            }
-
-            private void GaussianBlur(CommandBuffer cmd, in RenderTargetIdentifier blurTarget)
-            {
-                for (int i = 0; i < Blur.Iterations; i++)
-                {
-                    cmd.SetGlobalFloat(ShaderConstants._GaussianBlurSize, 1.0f + i * Blur.Spread);
-
-                    // vertical
-                    cmd.SetRenderTarget(ShaderConstants._TempBlurTex,
-                        RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store,     // color
-                        RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare); // depth
-                    cmd.Blit(blurTarget, BuiltinRenderTextureType.CurrentActive, BlurMaterial, 0);
-
-                    // horizontal
-                    cmd.SetRenderTarget(blurTarget,
-                        RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store,     // color
-                        RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare); // depth
-                    cmd.Blit(ShaderConstants._TempBlurTex, BuiltinRenderTextureType.CurrentActive, BlurMaterial, 1);
-                }
+                context.ExecuteCommandBuffer(cmd);
+                CommandBufferPool.Release(cmd);
             }
 
             private void RenderUI(ScriptableRenderContext context, ref RenderingData renderingData, int layerMask)
@@ -348,6 +326,24 @@ namespace VentiCola.UI.Rendering
                 var drawSettings = CreateDrawingSettings(m_ShaderTagIdList, ref renderingData, SortingCriteria.CommonTransparent);
                 var filterSettings = new FilteringSettings(RenderQueueRange.transparent, layerMask);
                 context.DrawRenderers(renderingData.cullResults, ref drawSettings, ref filterSettings);
+            }
+
+            public override void OnCameraCleanup(CommandBuffer cmd)
+            {
+                OnDidRender?.Invoke(m_FrameCountWithoutBlur);
+
+                if (BlurOpt == BlurOption.Disable)
+                {
+                    if (BlurDestination != null)
+                    {
+                        RenderTexture.ReleaseTemporary(BlurDestination);
+                        BlurDestination = null;
+                    }
+
+                    return;
+                }
+
+                cmd.ReleaseTemporaryRT(ShaderConstants._TempBlurTexture);
             }
         }
     }

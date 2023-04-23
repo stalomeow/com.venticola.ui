@@ -4,42 +4,28 @@ using UnityEngine;
 namespace VentiCola.UI
 {
     [DisallowMultipleComponent]
+    [RequireComponent(typeof(Canvas))]
+    [RequireComponent(typeof(CanvasGroup))]
     public abstract class BaseUIPageView : MonoBehaviour
     {
         [NonSerialized] private IViewController m_Controller;
-        // [NonSerialized] private Animator m_Animator;
         [NonSerialized] private Canvas m_Canvas;
+        [NonSerialized] private CanvasGroup m_CanvasGroup;
 
         protected BaseUIPageView() { }
 
-        // public Animator Animator => m_Animator;
+#pragma warning disable IDE1006 // Naming Styles
 
-        public Canvas Canvas => m_Canvas;
+        public Canvas canvas => m_Canvas;
 
-        internal void BindController(IViewController controller)
+        public CanvasGroup canvasGroup => m_CanvasGroup;
+
+#pragma warning restore IDE1006 // Naming Styles
+
+        protected virtual void Awake()
         {
-            m_Controller = controller;
-            // m_Animator = GetComponent<Animator>();
             m_Canvas = GetComponent<Canvas>();
-        }
-
-        internal void UpdateCanvas(int? sortingOrder)
-        {
-            if (sortingOrder.HasValue)
-            {
-                m_Canvas.overrideSorting = true;
-                m_Canvas.sortingOrder = sortingOrder.Value;
-            }
-            else
-            {
-                m_Canvas.overrideSorting = false;
-            }
-        }
-
-        internal void UnbindController()
-        {
-            m_Controller = null;
-            // m_Animator = null;
+            m_CanvasGroup = GetComponent<CanvasGroup>();
         }
 
         protected virtual void Update()
@@ -52,19 +38,35 @@ namespace VentiCola.UI
             m_Controller?.LateUpdate();
         }
 
-        //private void CheckAnimator(out bool isRunning)
-        //{
-        //    var animator = GetViewInternal().Animator;
+        internal void BindController(IViewController controller)
+        {
+            m_Controller = controller;
+        }
 
-        //    if (animator != null && animator.GetCurrentAnimatorStateInfo(0).normalizedTime < 1)
-        //    {
-        //        isRunning = true;
-        //        m_OnChangedCallback(this);
-        //    }
-        //    else
-        //    {
-        //        isRunning = false;
-        //    }
-        //}
+        internal void UpdateCanvas(int? sortingOrder)
+        {
+            // 注：只有 nested canvas 才能设置 overrideSorting
+            // 如果不是 nested，赋值会被忽略
+
+            if (sortingOrder.HasValue)
+            {
+                m_Canvas.overrideSorting = true;
+                m_Canvas.sortingOrder = sortingOrder.Value;
+            }
+            else
+            {
+                m_Canvas.overrideSorting = false;
+            }
+        }
+
+        internal void UpdateCanvasGroup(bool blocksRaycasts)
+        {
+            m_CanvasGroup.blocksRaycasts = blocksRaycasts;
+        }
+
+        internal void UnbindController()
+        {
+            m_Controller = null;
+        }
     }
 }

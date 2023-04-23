@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using VentiCola.UI.Bindings.Experimental;
 using Object = UnityEngine.Object;
 
-namespace VentiCola.UI.Bindings.LowLevel
+namespace VentiCola.UI.Bindings.LowLevel.Experimental
 {
     public class ForEachBinding<T> : BaseBinding
     {

@@ -1,7 +1,10 @@
 using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using VentiCola.UI;
 using VentiCola.UI.Bindings;
+using VentiCola.UI.Bindings.Experimental;
 
 namespace VentiColaTests.UI
 {
@@ -91,7 +94,7 @@ namespace VentiColaTests.UI
         public static ReactiveList<TestCharacterModel> Characters { get; set; }
     }
 
-    public class TestComplexPage : BaseUIPageView
+    public class TestComplexPage : BaseUIPageView, IDragHandler
     {
         public CanvasGroup PageCanvasGroup;
         public Button CloseButton;
@@ -103,6 +106,7 @@ namespace VentiColaTests.UI
         public Button CharListItemButton;
 
         [Header("Tab Toggle Group")]
+        public GameObject TabTogglePanel;
         public Toggle PropertiesTabToggle;
         public Toggle WeaponTabToggle;
         public Toggle TalentTabToggle;
@@ -138,5 +142,12 @@ namespace VentiColaTests.UI
         public TransitionConfig PageAlphaTransConfig;
         public TransitionConfig ExpBarFillAmountTransConfig;
         public TransitionConfig LoveBarFillAmountTransConfig;
+
+        public UnityAction<PointerEventData> OnDragHandler;
+
+        void IDragHandler.OnDrag(PointerEventData eventData)
+        {
+            OnDragHandler?.Invoke(eventData);
+        }
     }
 }

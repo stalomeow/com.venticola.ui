@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Pool;
 using VentiCola.UI.Internal;
 
-namespace VentiCola.UI.Bindings.LowLevel
+namespace VentiCola.UI.Bindings.LowLevel.Experimental
 {
     public sealed class ForEachItemBinding : BaseBinding
     {

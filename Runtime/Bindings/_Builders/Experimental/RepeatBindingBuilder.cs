@@ -1,8 +1,9 @@
 using System;
 using UnityEngine;
 using VentiCola.UI.Bindings.LowLevel;
+using VentiCola.UI.Bindings.LowLevel.Experimental;
 
-namespace VentiCola.UI.Bindings
+namespace VentiCola.UI.Bindings.Experimental
 {
     public static class RepeatBindingBuilder
     {

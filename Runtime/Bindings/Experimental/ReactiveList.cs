@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using VentiCola.UI.Internal;
 
-namespace VentiCola.UI.Bindings
+namespace VentiCola.UI.Bindings.Experimental
 {
     public class ReactiveList<T> : IList<T>, IReactiveCollection
     {

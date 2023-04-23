@@ -1,5 +1,8 @@
+using System;
+
 namespace VentiCola.UI
 {
+    [Serializable]
     public struct UIConfig
     {
         public string PrefabKey;

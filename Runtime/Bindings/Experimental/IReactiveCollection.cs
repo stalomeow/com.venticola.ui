@@ -1,6 +1,6 @@
 using System;
 
-namespace VentiCola.UI.Bindings
+namespace VentiCola.UI.Bindings.Experimental
 {
     /// <summary>
     /// 表示一个响应式的集合

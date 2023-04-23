@@ -8,30 +8,20 @@ namespace VentiCola.UI.Rendering
     public class CameraOverrideSettings
     {
         public CameraClearFlags ClearFlags = CameraClearFlags.Nothing;
-
         public LayerMask CullingMask = 0;
-
-        public int RendererIndex = -1;
-
         public bool RenderShadows = false;
-
         public bool PostProcessing = false;
-
         public AntialiasingMode Antialiasing = AntialiasingMode.None;
-
         public CameraOverrideOption OpaqueTexture = CameraOverrideOption.Off;
-
         public CameraOverrideOption DepthTexture = CameraOverrideOption.Off;
 
         public void CopyFrom(Camera camera, UniversalAdditionalCameraData urpData)
         {
             ClearFlags = camera.clearFlags;
             CullingMask = camera.cullingMask;
-
-            //ScriptableRendererIndex = 
-            Antialiasing = urpData.antialiasing;
-            PostProcessing = urpData.renderPostProcessing;
             RenderShadows = urpData.renderShadows;
+            PostProcessing = urpData.renderPostProcessing;
+            Antialiasing = urpData.antialiasing;
             OpaqueTexture = urpData.requiresColorOption;
             DepthTexture = urpData.requiresDepthOption;
         }
@@ -40,9 +30,9 @@ namespace VentiCola.UI.Rendering
         {
             camera.clearFlags = ClearFlags;
             camera.cullingMask = CullingMask;
-            urpData.antialiasing = Antialiasing;
-            urpData.renderPostProcessing = PostProcessing;
             urpData.renderShadows = RenderShadows;
+            urpData.renderPostProcessing = PostProcessing;
+            urpData.antialiasing = Antialiasing;
             urpData.requiresColorOption = OpaqueTexture;
             urpData.requiresDepthOption = DepthTexture;
         }

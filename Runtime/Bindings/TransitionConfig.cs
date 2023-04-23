@@ -43,5 +43,23 @@ namespace VentiCola.UI.Bindings
                 UseTimeScale = timeScale
             };
         }
+
+        public static SharedValue<TransitionConfig> WithShared(
+            float duration,
+            float delay = 0f,
+            EasingCurve easing = default,
+            bool timeScale = false)
+        {
+            return new SharedValue<TransitionConfig>()
+            {
+                Value = new TransitionConfig()
+                {
+                    Delay = delay,
+                    Duration = duration,
+                    Easing = easing,
+                    UseTimeScale = timeScale
+                }
+            };
+        }
     }
 }
