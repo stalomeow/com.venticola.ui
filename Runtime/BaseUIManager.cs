@@ -170,6 +170,7 @@ namespace VentiCola.UI
             MakeAnimatable<Vector3>(Vector3.LerpUnclamped);
             MakeAnimatable<Vector4>(Vector4.LerpUnclamped);
             MakeAnimatable<Color>(Color.LerpUnclamped);
+            MakeAnimatable<Quaternion>(Quaternion.LerpUnclamped);
         }
 
         public void PrepareEnvironment() { } // empty method
@@ -239,7 +240,7 @@ namespace VentiCola.UI
                 PauseTopPageGroup();
             }
 
-            SetGameObjectLayer(viewInstance, AdvancedUIRenderer.TopLayer);
+            SetGameObjectLayer(viewInstance, AdvancedUIRenderer.VisibleLayer);
             SetGameObjectParent(viewInstance, m_UIRoot, true);
 
             m_ViewStack.Add(controller);
@@ -311,7 +312,7 @@ namespace VentiCola.UI
 
             while (i < blocker.StackIndex)
             {
-                SetGameObjectLayer(m_ViewStack[i].ViewInstance, AdvancedUIRenderer.NormalLayer);
+                SetGameObjectLayer(m_ViewStack[i].ViewInstance, AdvancedUIRenderer.HiddenUILayer);
                 i++;
             }
 
@@ -574,7 +575,7 @@ namespace VentiCola.UI
 
                     while (i < blocker.StackIndex)
                     {
-                        SetGameObjectLayer(m_ViewStack[i].ViewInstance, AdvancedUIRenderer.TopLayer);
+                        SetGameObjectLayer(m_ViewStack[i].ViewInstance, AdvancedUIRenderer.VisibleLayer);
                         i++;
                     }
                 }

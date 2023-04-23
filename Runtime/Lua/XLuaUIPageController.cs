@@ -7,7 +7,7 @@ namespace VentiCola.UI.Lua
 {
     public class XLuaUIPageController : BaseUIPageControllerComplex<XLuaUIPageView>
     {
-
+        // TODO
     }
 }
 #endif

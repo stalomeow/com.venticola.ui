@@ -15,7 +15,7 @@ namespace VentiCola.UI.Rendering
 
             // Precomputed shader ids to save some CPU cycles (mostly affects mobile)
             public static readonly int _UIBlurTexture = Shader.PropertyToID("_UIBlurTexture");
-            public static readonly int _TempBlurTexture = Shader.PropertyToID("_TempBlurTex");
+            public static readonly int _TempBlurTexture = Shader.PropertyToID("_TempBlurTexture");
             public static readonly int _GaussianBlurSize = Shader.PropertyToID("_GaussianBlurSize");
         }
 

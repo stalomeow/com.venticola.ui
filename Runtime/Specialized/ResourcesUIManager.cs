@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace VentiCola.UI
+namespace VentiCola.UI.Specialized
 {
     public class ResourcesUIManager : BaseUIManager
     {

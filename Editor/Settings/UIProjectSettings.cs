@@ -12,7 +12,7 @@ namespace VentiColaEditor.UI.Settings
         [SerializeField] private List<string> m_CodeInjectionAssemblyWhiteList = new()
         {
             "Assembly-CSharp",
-            "VentiCola.UI.Tests"
+            // "VentiCola.UI.Tests"
         };
 
         /// <summary>

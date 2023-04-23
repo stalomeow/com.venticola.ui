@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.Serialization;
 using VentiCola.UI.Internal;
 using static VentiCola.UI.Rendering.BlurUtility;
 
@@ -13,18 +14,27 @@ namespace VentiCola.UI.Rendering
     {
         private static AdvancedUIRenderer s_Instance;
 
-        [SerializeField] private BlurSettings m_Blur = new();
-        [SerializeField, LayerPopup] private int m_UILayer = 5; // Builtin Layer: "UI"
-        [SerializeField, LayerPopup] private int m_TopUILayer = 0;
-        [NonSerialized] private CustomRenderPass m_ScriptablePass;
+        [SerializeField]
+        private BlurSettings m_Blur = new();
+
+        [SerializeField, LayerPopup]
+        [FormerlySerializedAs("m_UILayer")]
+        private int m_HiddenUILayer = 0;
+
+        [SerializeField, LayerPopup]
+        [FormerlySerializedAs("m_TopUILayer")]
+        private int m_VisibleUILayer = 5; // Builtin Layer: "UI"
+
+        [NonSerialized]
+        private CustomRenderPass m_ScriptablePass;
 
         public static bool UIChanged { get; set; }
 
         public static BlurOption BlurOpt { get; set; }
 
-        public static int TopLayer => s_Instance.m_TopUILayer;
+        public static int VisibleLayer => s_Instance.m_VisibleUILayer;
 
-        public static int NormalLayer => s_Instance.m_UILayer;
+        public static int HiddenUILayer => s_Instance.m_HiddenUILayer;
 
         public static event Action<int> OnDidRender;
 
@@ -80,8 +90,8 @@ namespace VentiCola.UI.Rendering
                 m_ScriptablePass.BlurMaterial = null;
             }
 
-            m_ScriptablePass.TopUILayerMask = (1 << m_TopUILayer);
-            m_ScriptablePass.UILayerMask = (1 << m_UILayer);
+            m_ScriptablePass.VisibleUILayerMask = (1 << m_VisibleUILayer);
+            m_ScriptablePass.HiddenUILayerMask = (1 << m_HiddenUILayer);
         }
 
         // Here you can inject one or multiple render passes in the renderer.
@@ -89,8 +99,9 @@ namespace VentiCola.UI.Rendering
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             m_ScriptablePass.UIChanged = UIChanged;
-            m_ScriptablePass.BlurOpt = BlurOpt; // 防止 main camera 没开启
+            m_ScriptablePass.BlurOpt = BlurOpt;
             renderer.EnqueuePass(m_ScriptablePass);
+
             UIChanged = false;
         }
 
@@ -111,6 +122,8 @@ namespace VentiCola.UI.Rendering
         private class CustomRenderPass : ScriptableRenderPass
         {
             private readonly ProfilingSampler m_FullRenderWithBlurProfilingSampler = new("Full UI Rendering With Blur");
+            private readonly ProfilingSampler m_FastRenderWithCachedBlurTexProfilingSampler = new("Fast UI Rendering With Cached Blur");
+            private readonly ProfilingSampler m_FastRenderWithoutBlurProfilingSampler = new("Fast UI Rendering Without Blur");
             private readonly List<ShaderTagId> m_ShaderTagIdList = new()
             {
                 new ShaderTagId("SRPDefaultUnlit"),
@@ -120,8 +133,8 @@ namespace VentiCola.UI.Rendering
 
             public BlurSettings Blur;
             public Material BlurMaterial;
-            public int TopUILayerMask;
-            public int UILayerMask;
+            public int VisibleUILayerMask;
+            public int HiddenUILayerMask;
 
             public bool UIChanged;
             public BlurOption BlurOpt;
@@ -171,7 +184,7 @@ namespace VentiCola.UI.Rendering
                 if (BlurDestination.GetInstanceID() != lastInstanceID)
                 {
                     UIChanged = true; // 屏幕分辨率等设置发生变化
-                    Debug.LogWarning("NEW Blur RT");
+                    // Debug.LogWarning("NEW Blur RT");
                 }
             }
 
@@ -230,14 +243,12 @@ namespace VentiCola.UI.Rendering
 
                 using (new ProfilingScope(cmd, m_FullRenderWithBlurProfilingSampler))
                 {
-                    // first render ui
                     cmd.DisableKeyword(in ShaderConstants.VENTI_COLA_ENABLE_UI_BLUR);
                     context.ExecuteCommandBuffer(cmd);
                     cmd.Clear();
 
-                    RenderUI(context, ref renderingData, UILayerMask);
-
-                    cmd.EnableKeyword(in ShaderConstants.VENTI_COLA_ENABLE_UI_BLUR);
+                    // render hidden ui
+                    RenderUI(context, ref renderingData, HiddenUILayerMask);
 
                     // downsampling
                     cmd.SetRenderTarget(blurTarget,
@@ -264,12 +275,16 @@ namespace VentiCola.UI.Rendering
                         cmd.Blit(blurTarget, BuiltinRenderTextureType.CurrentActive);
                     }
 
+                    cmd.EnableKeyword(in ShaderConstants.VENTI_COLA_ENABLE_UI_BLUR);
+
                     // execute before rendering top UI
                     context.ExecuteCommandBuffer(cmd);
                     cmd.Clear();
 
                     // render top UI
-                    RenderUI(context, ref renderingData, TopUILayerMask);
+                    RenderUI(context, ref renderingData, VisibleUILayerMask);
+
+                    cmd.DisableKeyword(in ShaderConstants.VENTI_COLA_ENABLE_UI_BLUR);
                 }
 
                 context.ExecuteCommandBuffer(cmd);
@@ -284,9 +299,9 @@ namespace VentiCola.UI.Rendering
                 // Currently there's an issue which results in mismatched markers.
                 CommandBuffer cmd = CommandBufferPool.Get();
 
-                using (new ProfilingScope(cmd, m_FullRenderWithBlurProfilingSampler))
+                using (new ProfilingScope(cmd, m_FastRenderWithCachedBlurTexProfilingSampler))
                 {
-                    // render the blur layer instead of ui below
+                    // render the cached blur texture instead of the UI below
                     cmd.Blit(blurTarget, BuiltinRenderTextureType.CurrentActive);
 
                     // execute before rendering top UI
@@ -294,7 +309,7 @@ namespace VentiCola.UI.Rendering
                     cmd.Clear();
 
                     // render top UI
-                    RenderUI(context, ref renderingData, TopUILayerMask);
+                    RenderUI(context, ref renderingData, VisibleUILayerMask);
                 }
 
                 context.ExecuteCommandBuffer(cmd);
@@ -303,22 +318,11 @@ namespace VentiCola.UI.Rendering
 
             private void DoFastRenderWithoutBlur(ref ScriptableRenderContext context, ref RenderingData renderingData)
             {
-                // NOTE: Do NOT mix ProfilingScope with named CommandBuffers i.e. CommandBufferPool.Get("name").
-                // Currently there's an issue which results in mismatched markers.
-                CommandBuffer cmd = CommandBufferPool.Get();
-
-                using (new ProfilingScope(cmd, m_FullRenderWithBlurProfilingSampler))
+                using (new ProfilingScope(null, m_FastRenderWithoutBlurProfilingSampler))
                 {
-                    cmd.DisableKeyword(in ShaderConstants.VENTI_COLA_ENABLE_UI_BLUR);
-                    context.ExecuteCommandBuffer(cmd);
-                    cmd.Clear();
-
                     // render top UI only
-                    RenderUI(context, ref renderingData, TopUILayerMask);
+                    RenderUI(context, ref renderingData, VisibleUILayerMask);
                 }
-
-                context.ExecuteCommandBuffer(cmd);
-                CommandBufferPool.Release(cmd);
             }
 
             private void RenderUI(ScriptableRenderContext context, ref RenderingData renderingData, int layerMask)

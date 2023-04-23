@@ -4,9 +4,6 @@ using UnityEngine;
 using UnityEngine.Pool;
 using VentiCola.UI.Internal;
 
-// TODO: Double Check Value before real rendering.
-// TODO: Add Method to reset version and dirty flag only.
-
 namespace VentiCola.UI.Bindings.LowLevel
 {
     // 一个 Binding 不应该关心自己的父节点，不应该修改自己的父节点以及同级节点，只能修改自己和子节点

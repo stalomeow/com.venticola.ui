@@ -1,6 +1,7 @@
 using UnityEngine.Events;
 using VentiCola.UI;
 using VentiCola.UI.Bindings;
+using VentiCola.UI.Specialized;
 
 namespace VentiColaTests.UI
 {
