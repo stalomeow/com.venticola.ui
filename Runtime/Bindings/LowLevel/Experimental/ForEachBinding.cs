@@ -6,16 +6,18 @@ using Object = UnityEngine.Object;
 
 namespace VentiCola.UI.Bindings.LowLevel.Experimental
 {
+    // TODO
+
     public class ForEachBinding<T> : BaseBinding
     {
         private Func<IReactiveCollection> m_CollectionFunc;
 
-        private IEqualityComparer<T> m_EqualityComparer;
+        //private IEqualityComparer<T> m_EqualityComparer;
         private Action<int, T> m_RenderItemAction;
 
-        private IReactiveCollection m_LastCollection;
-        private Stack<GameObject> m_ItemPool;
-        private List<GameObject> m_ItemList;
+        //private IReactiveCollection m_LastCollection;
+        //private Stack<GameObject> m_ItemPool;
+        //private List<GameObject> m_ItemList;
 
         public void Initalize(
             GameObject mountTarget,
@@ -26,7 +28,7 @@ namespace VentiCola.UI.Bindings.LowLevel.Experimental
 
             m_CollectionFunc = collectionFunc;
 
-            m_EqualityComparer = EqualityComparer<T>.Default;
+            //m_EqualityComparer = EqualityComparer<T>.Default;
             m_RenderItemAction = renderItemAction;
 
             mountTarget.SetActive(false); // 隐藏 template

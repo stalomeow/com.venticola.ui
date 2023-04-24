@@ -7,6 +7,7 @@ using VentiCola.UI.Internal;
 namespace VentiCola.UI.Bindings.LowLevel
 {
     // 一个 Binding 不应该关心自己的父节点，不应该修改自己的父节点以及同级节点，只能修改自己和子节点
+    // 也不能把自己 Detach 掉，除非你知道在干什么！
 
     public abstract class BaseBinding : IChangeObserver, IVersionable
     {

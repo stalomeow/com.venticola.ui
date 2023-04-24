@@ -9,6 +9,6 @@ namespace VentiCola.UI.Misc
     [AddComponentMenu("UI/Image (Blur BG)", 11)]
     public class BlurBGImage : Image
     {
-        public override Material defaultMaterial => BlurUtility.BlurBackgroundMaterial;
+        public override Material defaultMaterial => BlurUtils.BlurBackgroundMaterial;
     }
 }

@@ -213,8 +213,11 @@ namespace VentiColaEditor.UI.CustomEditors
 
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.PropertyField(m_EnableMainCameraOverrideSettings, EditorGUIUtility.TrTextContent("Enable"));
-                EditorGUILayout.HelpBox("If enabled, these settings will be temporarily applied to the Main Camera to reduce overdraw when a UI covers the entire screen.", MessageType.Info);
+                using (new EditorGUI.DisabledScope(EditorApplication.isPlaying))
+                {
+                    EditorGUILayout.PropertyField(m_EnableMainCameraOverrideSettings, EditorGUIUtility.TrTextContent("Enable"));
+                    EditorGUILayout.HelpBox("If enabled, when a UI covers the entire screen, these settings will be temporarily applied to the Main Camera to reduce overdraw.", MessageType.Info);
+                }
 
                 using (new EditorGUI.DisabledScope(!m_EnableMainCameraOverrideSettings.boolValue))
                 {
@@ -239,8 +242,11 @@ namespace VentiColaEditor.UI.CustomEditors
 
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.PropertyField(m_EnableMainCameraRendererSettings, EditorGUIUtility.TrTextContent("Enable"));
-                EditorGUILayout.HelpBox("If enabled, the Light Weight Renderer will be temporarily applied to Main Camera to improve performance when a UI covers the entire screen.", MessageType.Info);
+                using (new EditorGUI.DisabledScope(EditorApplication.isPlaying))
+                {
+                    EditorGUILayout.PropertyField(m_EnableMainCameraRendererSettings, EditorGUIUtility.TrTextContent("Enable"));
+                    EditorGUILayout.HelpBox("If enabled, when a UI covers the entire screen, the Light Weight Renderer will be temporarily applied to Main Camera to improve performance.", MessageType.Info);
+                }
 
                 using (new EditorGUI.DisabledScope(!m_EnableMainCameraRendererSettings.boolValue))
                 {

@@ -150,7 +150,7 @@ namespace VentiColaEditor.UI.Settings
         private void DrawEditorOptionsFields()
         {
             var oldValue = m_AutoCodeInjection.boolValue;
-            var newValue = EditorGUILayout.Toggle("Execute After Compilation", oldValue);
+            var newValue = EditorGUILayout.Toggle("Execute Automatically", oldValue);
             m_AutoCodeInjection.boolValue = newValue;
         }
 

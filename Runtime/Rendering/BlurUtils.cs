@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -7,7 +8,7 @@ using UnityEditor;
 
 namespace VentiCola.UI.Rendering
 {
-    internal static class BlurUtility
+    internal static class BlurUtils
     {
         public static class ShaderConstants
         {
@@ -20,6 +21,7 @@ namespace VentiCola.UI.Rendering
         }
 
         private static Material s_BlurBackgroundMaterial;
+        private static Material s_GaussianBlurMaterial;
 
         public static Material BlurBackgroundMaterial
         {
@@ -44,11 +46,32 @@ namespace VentiCola.UI.Rendering
         }
 #endif
 
-        public static void GaussianBlur(BlurSettings settings, Material material, CommandBuffer cmd, in RenderTargetIdentifier blurTarget)
+        private static Material GetOrCreateMaterial(ref Material location, BlurAlgorithm algorithm)
         {
-            for (int i = 0; i < settings.Iterations; i++)
+            if (location == null)
             {
-                cmd.SetGlobalFloat(ShaderConstants._GaussianBlurSize, 1.0f + i * settings.Spread);
+                var shaders = UIRuntimeSettings.Instance.DefaultShaders;
+                Shader shader = algorithm switch
+                {
+                    BlurAlgorithm.Gaussian => shaders.GaussianBlur,
+                    BlurAlgorithm.Box => shaders.BoxBlur,
+                    BlurAlgorithm.Kawase => shaders.KawaseBlur,
+                    BlurAlgorithm.Dual => shaders.DualBlur,
+                    _ => throw new NotSupportedException(),
+                };
+                location = new Material(shader);
+            }
+
+            return location;
+        }
+
+        public static void GaussianBlur(CommandBuffer cmd, in RenderTargetIdentifier blurTarget, int iterations, float spread)
+        {
+            Material material = GetOrCreateMaterial(ref s_GaussianBlurMaterial, BlurAlgorithm.Gaussian);
+
+            for (int i = 0; i < iterations; i++)
+            {
+                cmd.SetGlobalFloat(ShaderConstants._GaussianBlurSize, 1.0f + i * spread);
 
                 // vertical
                 cmd.SetRenderTarget(ShaderConstants._TempBlurTexture,

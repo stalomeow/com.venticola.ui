@@ -52,7 +52,7 @@ namespace VentiColaEditor.UI.Settings
         /// <summary>
         /// 在 ProjectSettings 窗口中的路径
         /// </summary>
-        public const string PathInProjectSettings = "Project/VentiCola/UI";
+        public const string PathInProjectSettings = "Project/VentiCola UI";
 
         /// <summary>
         /// 在 ProjectSettings 窗口中打开

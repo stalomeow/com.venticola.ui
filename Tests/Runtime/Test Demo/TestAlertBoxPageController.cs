@@ -34,7 +34,7 @@ namespace VentiColaTests.UI
         public TestAlertBoxPageController()
         {
             Config.PrefabKey = "Test Alert Box";
-            Config.RenderOption = UIRenderOption.FullScreenStaticBlur;
+            Config.RenderOption = UIRenderOption.FullScreenBlurDynamic;
             Config.IsAdditive = true;
         }
 

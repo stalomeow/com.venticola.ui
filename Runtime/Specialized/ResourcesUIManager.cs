@@ -5,8 +5,6 @@ namespace VentiCola.UI.Specialized
 {
     public class ResourcesUIManager : BaseUIManager
     {
-        public ResourcesUIManager() { }
-
         protected override void LoadPrefabAsync(string key, Action<string, GameObject> callback)
         {
             Resources.LoadAsync<GameObject>(key).completed += op =>

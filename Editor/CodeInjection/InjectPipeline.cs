@@ -40,14 +40,14 @@ namespace VentiColaEditor.UI.CodeInjection
             }
         }
 
-        [MenuItem("VentiCola/UI/Inject Codes (Reload)", true)]
-        [MenuItem("VentiCola/UI/Inject Codes (Recompile)", true)]
+        [MenuItem("Tools/VentiCola UI/Inject Codes (Reload)", true)]
+        [MenuItem("Tools/VentiCola UI/Inject Codes (Recompile)", true)]
         private static bool InjectCodesValidator()
         {
             return !EditorApplication.isCompiling && !EditorApplication.isPlaying;
         }
 
-        [MenuItem("VentiCola/UI/Inject Codes (Reload)")]
+        [MenuItem("Tools/VentiCola UI/Inject Codes (Reload)")]
         public static void InjectCodesWithReload()
         {
             if (!InjectCodesValidator())
@@ -68,7 +68,7 @@ namespace VentiColaEditor.UI.CodeInjection
             }
         }
 
-        [MenuItem("VentiCola/UI/Inject Codes (Recompile)")]
+        [MenuItem("Tools/VentiCola UI/Inject Codes (Recompile)")]
         public static void InjectCodesWithRecompilation()
         {
             if (!InjectCodesValidator())

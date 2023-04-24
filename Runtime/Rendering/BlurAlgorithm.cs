@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace VentiCola.UI.Rendering
 {
-    public enum BlurAlgorithm
+    internal enum BlurAlgorithm
     {
         [InspectorName("Gaussian")]
         Gaussian,

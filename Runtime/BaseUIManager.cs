@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.SceneManagement;
 using VentiCola.UI.Bindings.LowLevel;
 using VentiCola.UI.Internal;
 using VentiCola.UI.Rendering;
@@ -12,20 +13,6 @@ namespace VentiCola.UI
 {
     public abstract class BaseUIManager
     {
-        protected enum BlockerType
-        {
-            StaticBlur,
-            DynmaicBlur,
-            TextureBlur,
-            Opaque
-        }
-
-        protected struct BlockerInfo
-        {
-            public int StackIndex;
-            public BlockerType Type;
-        }
-
         protected class PrefabEntry
         {
             public GameObject Prefab;
@@ -38,13 +25,13 @@ namespace VentiCola.UI
         protected readonly Action<IViewController> m_ClosedCallback;
 
         protected readonly List<IViewController> m_ViewStack;
-        protected readonly List<BlockerInfo> m_BlockerStack;
+        protected readonly List<int> m_BlockerStack;
         protected readonly Dictionary<string, PrefabEntry> m_PrefabCache;
         protected readonly Dictionary<string, GameObject> m_PersistentCache;
         protected readonly LRUMultiHashMap<string, GameObject> m_LRUCache;
 
-        private readonly CameraOverrideSettings m_MainCameraFullSettings;
-        private bool m_IsMainCameraRenderingStopped;
+        protected readonly CameraOverrideSettings m_MainCameraFullSettings;
+        protected bool m_IsMainCameraRenderingStopped;
 
         protected Transform m_UIRoot;
         protected Transform m_UIPoolRoot;
@@ -59,11 +46,11 @@ namespace VentiCola.UI
             m_ClosedCallback = OnViewClosed;
 
             m_ViewStack = new List<IViewController>();
-            m_BlockerStack = new List<BlockerInfo>();
+            m_BlockerStack = new List<int>();
             m_PrefabCache = new Dictionary<string, PrefabEntry>();
             m_PersistentCache = new Dictionary<string, GameObject>();
             m_LRUCache = new LRUMultiHashMap<string, GameObject>(UIRuntimeSettings.Instance.LRUCacheSize);
-            m_LRUCache.OnEliminated += OnLRUPageEliminated;
+            m_LRUCache.OnEliminated += OnLRUViewEliminated;
 
             m_MainCameraFullSettings = new CameraOverrideSettings();
             m_IsMainCameraRenderingStopped = false;
@@ -72,19 +59,26 @@ namespace VentiCola.UI
             InitUIRootAndCamera();
             InitBuiltinAnimatableTypes();
 
-            AdvancedUIRenderer.OnDidRender += frameCountWithoutBlur =>
+            AdvancedUIRenderer.OnDidRender += (int frameCountWithoutBlur) =>
             {
-                if (m_IsMainCameraRenderingStopped || AdvancedUIRenderer.UIChanged)
+                if (m_IsMainCameraRenderingStopped || AdvancedUIRenderer.UIChanged || frameCountWithoutBlur < 10)
                 {
                     return;
                 }
 
-                if (TryGetTopBlockerIfActive(out var blocker) && frameCountWithoutBlur > 10)
+                if (TryGetTopBlockerIfActive(out _, out _))
                 {
-                    if (blocker.Type != BlockerType.TextureBlur)
-                    {
-                        SwitchMainCameraSettings(false);
-                    }
+                    SwitchMainCameraSettings(false);
+                }
+            };
+
+            SceneManager.activeSceneChanged += (Scene prev, Scene curr) =>
+            {
+                Camera mainCamera = Camera.main;
+
+                if (mainCamera != m_MainCamera)
+                {
+                    MainCamera = mainCamera;
                 }
             };
         }
@@ -96,11 +90,18 @@ namespace VentiCola.UI
             {
                 if (m_MainCameraUrpData != null)
                 {
+                    // 还原之前的 Main Camera
+                    if (m_IsMainCameraRenderingStopped)
+                    {
+                        SwitchMainCameraSettings(true);
+                    }
+
                     m_MainCameraUrpData.cameraStack.Remove(m_UICamera);
                 }
 
                 m_MainCamera = value;
                 m_MainCameraUrpData = m_MainCamera.GetUniversalAdditionalCameraData();
+                m_IsMainCameraRenderingStopped = false;
 
                 List<Camera> cameraStack = m_MainCameraUrpData.cameraStack;
 
@@ -111,7 +112,7 @@ namespace VentiCola.UI
             }
         }
 
-        protected virtual void OnLRUPageEliminated(string prefabKey, GameObject viewInstance)
+        protected virtual void OnLRUViewEliminated(string prefabKey, GameObject viewInstance)
         {
             DestroyViewInstance(prefabKey, viewInstance);
             Debug.LogWarning($"LRU eliminate view instance '{prefabKey}'");
@@ -160,25 +161,22 @@ namespace VentiCola.UI
 
             m_UIRoot = canvas.transform;
             m_UICamera = canvas.worldCamera;
-            MainCamera = Camera.main;
+            MainCamera = Camera.main; // Set the MainCamera Property, not the m_MainCamera Field
         }
 
         private void InitBuiltinAnimatableTypes()
         {
-            MakeAnimatable<float>(Mathf.LerpUnclamped);
-            MakeAnimatable<Vector2>(Vector2.LerpUnclamped);
-            MakeAnimatable<Vector3>(Vector3.LerpUnclamped);
-            MakeAnimatable<Vector4>(Vector4.LerpUnclamped);
-            MakeAnimatable<Color>(Color.LerpUnclamped);
-            MakeAnimatable<Quaternion>(Quaternion.LerpUnclamped);
+            MakeTypeAnimatable<int>((a, b, t) => Mathf.RoundToInt(Mathf.LerpUnclamped(a, b, t)));
+            MakeTypeAnimatable<float>(Mathf.LerpUnclamped);
+            MakeTypeAnimatable<Vector2>(Vector2.LerpUnclamped);
+            MakeTypeAnimatable<Vector3>(Vector3.LerpUnclamped);
+            MakeTypeAnimatable<Vector4>(Vector4.LerpUnclamped);
+            MakeTypeAnimatable<Color>(Color.LerpUnclamped);
+            MakeTypeAnimatable<Color32>(Color32.LerpUnclamped);
+            MakeTypeAnimatable<Quaternion>(Quaternion.LerpUnclamped);
         }
 
         public void PrepareEnvironment() { } // empty method
-
-        public void ShowSingleton<T>() where T : class, IViewController, new()
-        {
-            Show(Singleton<T>.Instance);
-        }
 
         public void Show(IViewController controller)
         {
@@ -237,11 +235,12 @@ namespace VentiCola.UI
 
             if (!controller.Config.IsAdditive)
             {
-                PauseTopPageGroup();
+                PauseTopViewGroup();
             }
 
-            SetGameObjectLayer(viewInstance, AdvancedUIRenderer.VisibleLayer);
+            // reparent it first, update your data, and then enable it
             SetGameObjectParent(viewInstance, m_UIRoot, true);
+            SetGameObjectLayer(viewInstance, AdvancedUIRenderer.VisibleUILayer);
 
             m_ViewStack.Add(controller);
             controller.Open(stackIndex);
@@ -255,21 +254,10 @@ namespace VentiCola.UI
 
             if (controller.Config.RenderOption != UIRenderOption.None)
             {
-                AddBlocker(new BlockerInfo
-                {
-                    StackIndex = stackIndex,
-                    Type = controller.Config.RenderOption switch
-                    {
-                        UIRenderOption.FullScreenStaticBlur => BlockerType.StaticBlur,
-                        UIRenderOption.FullScreenDynamicBlur => BlockerType.DynmaicBlur,
-                        UIRenderOption.FullScreenOpaque => BlockerType.Opaque,
-                        UIRenderOption.DynamicBlurToTexture => BlockerType.TextureBlur,
-                        _ => throw new NotImplementedException()
-                    },
-                });
+                AddBlocker(stackIndex);
             }
 
-            UpdateRenderer();
+            UpdateRendererBlurOptionAndRerender();
         }
 
         protected bool TryGetViewInstanceFromCache(string key, UICacheType cacheType, out GameObject viewInstance)
@@ -287,7 +275,7 @@ namespace VentiCola.UI
             return false;
         }
 
-        protected void PauseTopPageGroup()
+        protected void PauseTopViewGroup()
         {
             for (int i = m_ViewStack.Count - 1; i >= 0; i--)
             {
@@ -305,42 +293,40 @@ namespace VentiCola.UI
             }
         }
 
-        protected void AddBlocker(BlockerInfo blocker)
+        protected void AddBlocker(int stackIndex)
         {
-            int lastBlockerIndex = m_BlockerStack.Count - 1;
-            int i = lastBlockerIndex < 0 ? 0 : m_BlockerStack[lastBlockerIndex].StackIndex;
-
-            while (i < blocker.StackIndex)
+            for (int i = m_BlockerStack.PeekBackOrDefault(0); i < stackIndex; i++)
             {
                 SetGameObjectLayer(m_ViewStack[i].ViewInstance, AdvancedUIRenderer.HiddenUILayer);
-                i++;
             }
 
-            m_BlockerStack.Add(blocker);
+            m_BlockerStack.Add(stackIndex);
         }
 
-        protected void UpdateRenderer()
+        protected void UpdateRendererBlurOptionAndRerender()
         {
-            if (!TryGetTopBlockerIfActive(out BlockerInfo blocker))
+            if (!TryGetTopBlockerIfActive(out _, out UIRenderOption renderOption))
             {
                 AdvancedUIRenderer.BlurOpt = BlurOption.Disable;
             }
             else
             {
-                AdvancedUIRenderer.BlurOpt = blocker.Type switch
+                AdvancedUIRenderer.BlurOpt = renderOption switch
                 {
-                    BlockerType.StaticBlur => BlurOption.FullScreenStatic,
-                    BlockerType.DynmaicBlur => BlurOption.FullScreenDynamic,
-                    BlockerType.TextureBlur => BlurOption.TextureDynamic,
+                    UIRenderOption.FullScreenBlurStatic => BlurOption.FullScreenStatic,
+                    UIRenderOption.FullScreenBlurDynamic => BlurOption.FullScreenDynamic,
+                    UIRenderOption.FullScreenBlurTexture => BlurOption.TextureDynamic,
                     _ => BlurOption.Disable,
                 };
             }
 
+            RequestUIRerendering();
+        }
+
+        protected void RequestUIRerendering()
+        {
             AdvancedUIRenderer.UIChanged = true;
-
             SwitchMainCameraSettings(true);
-
-            // Debug.LogFormat("Blocker Count: {0}", m_BlockerStack.Count);
         }
 
         protected void SwitchMainCameraSettings(bool full)
@@ -350,6 +336,8 @@ namespace VentiCola.UI
                 // 已经满足要求了
                 return;
             }
+
+            // TODO: Optimize this method.
 
             var settings = UIRuntimeSettings.Instance;
 
@@ -384,7 +372,6 @@ namespace VentiCola.UI
             }
             else
             {
-                // TODO: 再想想，真的吗？
                 // 每次都拷贝，防止 EnableMainCameraOverrideSettings 突然变化后 Camera 设置混乱
                 m_MainCameraFullSettings.CopyFrom(m_MainCamera, m_MainCameraUrpData);
 
@@ -443,54 +430,63 @@ namespace VentiCola.UI
 
         protected virtual void OnViewChanged(IViewController controller)
         {
+            if (AdvancedUIRenderer.UIChanged)
+            {
+                return;
+            }
+
+            // 当 Blur 层下的可见 UI 发生变化时，重新进行一次 Blur
+
             int stackIndex = controller.StackIndex;
-            int blockerCount = 0;
+            int totalBlockerCount = 0;
             int opaqueBlockerCount = 0;
 
             for (int i = m_BlockerStack.Count - 1; i >= 0; i--)
             {
-                BlockerInfo blocker = m_BlockerStack[i];
+                int blockerStackIndex = m_BlockerStack[i];
 
-                if (blocker.StackIndex <= stackIndex)
+                if (blockerStackIndex <= stackIndex)
                 {
                     break;
                 }
 
-                blockerCount++;
+                totalBlockerCount++;
 
-                if (blocker.Type == BlockerType.Opaque)
+                if (m_ViewStack[blockerStackIndex].Config.RenderOption == UIRenderOption.FullScreenOpaque)
                 {
                     opaqueBlockerCount++;
                     break;
                 }
             }
 
-            if (blockerCount > 0 && opaqueBlockerCount == 0)
+            if (totalBlockerCount > 0 && opaqueBlockerCount == 0)
             {
-                UpdateRenderer();
+                RequestUIRerendering();
             }
         }
 
-        protected bool TryGetTopBlockerIfActive(out BlockerInfo blocker)
+        protected bool TryGetTopBlockerIfActive(out int stackIndex, out UIRenderOption renderOption)
         {
-            if (m_BlockerStack.Count > 0)
+            int topIndex = m_BlockerStack.Count - 1;
+
+            if (topIndex >= 0)
             {
-                blocker = m_BlockerStack[^1];
+                stackIndex = m_BlockerStack[topIndex];
+                IViewController controller = m_ViewStack[stackIndex];
 
-                if (m_ViewStack[blocker.StackIndex].State != UIState.Active)
+                if (controller.State == UIState.Active)
                 {
-                    blocker = default;
-                    return false;
+                    renderOption = controller.Config.RenderOption;
+                    return true;
                 }
-
-                return true;
             }
 
-            blocker = default;
+            stackIndex = -1;
+            renderOption = default;
             return false;
         }
 
-        protected void ResumeTopPageGroup()
+        protected void ResumeTopViewGroup()
         {
             for (int i = m_ViewStack.Count - 1; i >= 0; i--)
             {
@@ -512,10 +508,10 @@ namespace VentiCola.UI
         {
             if (m_ViewStack.Count > 0)
             {
-                CloseLast();
+                CloseLastNoCheck();
             }
 
-            UpdateRenderer();
+            UpdateRendererBlurOptionAndRerender();
         }
 
         public void Close(IViewController controller)
@@ -529,54 +525,44 @@ namespace VentiCola.UI
 
             while (m_ViewStack.Count > stackIndex)
             {
-                CloseLast();
+                CloseLastNoCheck();
             }
 
-            UpdateRenderer();
+            UpdateRendererBlurOptionAndRerender();
         }
 
         public void CloseAll()
         {
             while (m_ViewStack.Count > 0)
             {
-                CloseLast();
+                CloseLastNoCheck();
             }
 
-            UpdateRenderer();
+            UpdateRendererBlurOptionAndRerender();
         }
 
-        protected void CloseLast()
+        protected void CloseLastNoCheck()
         {
-            if (m_ViewStack.Count <= 0)
-            {
-                return;
-            }
-
             IViewController controller = m_ViewStack.PopBackUnsafe();
 
             if (!controller.Config.IsAdditive)
             {
-                ResumeTopPageGroup();
+                ResumeTopViewGroup();
             }
 
             int lastBlockerIndex = m_BlockerStack.Count - 1;
 
             if (lastBlockerIndex >= 0)
             {
-                BlockerInfo blocker = m_BlockerStack[lastBlockerIndex];
+                int stackIndex = m_BlockerStack[lastBlockerIndex];
 
-                if (blocker.StackIndex == controller.StackIndex)
+                if (stackIndex == controller.StackIndex)
                 {
                     m_BlockerStack.RemoveAt(lastBlockerIndex);
 
-                    int i = m_BlockerStack.Count > 0
-                        ? m_BlockerStack[^1].StackIndex
-                        : 0;
-
-                    while (i < blocker.StackIndex)
+                    for (int i = m_BlockerStack.PeekBackOrDefault(0); i < stackIndex; i++)
                     {
-                        SetGameObjectLayer(m_ViewStack[i].ViewInstance, AdvancedUIRenderer.VisibleLayer);
-                        i++;
+                        SetGameObjectLayer(m_ViewStack[i].ViewInstance, AdvancedUIRenderer.VisibleUILayer);
                     }
                 }
             }
@@ -620,12 +606,12 @@ namespace VentiCola.UI
             SetGameObjectParent(viewInstance, m_UIPoolRoot, false);
         }
 
-        public void MakeAnimatable<T>(InterpolateFunction<T> interpolateFunction)
+        public void MakeTypeAnimatable<T>(InterpolateFunction<T> interpolateFunction)
         {
             InterpolationCache<T>.InterpolateFunc = interpolateFunction;
         }
 
-        private static void SetGameObjectParent(GameObject go, Transform parent, bool setAsLastSibling)
+        protected static void SetGameObjectParent(GameObject go, Transform parent, bool setAsLastSibling)
         {
             Transform transform = go.transform;
             transform.SetParent(parent, false);
@@ -636,7 +622,7 @@ namespace VentiCola.UI
             }
         }
 
-        private static void SetGameObjectLayer(GameObject go, int layer)
+        protected static void SetGameObjectLayer(GameObject go, int layer)
         {
             List<Transform> stack = ListPool<Transform>.Get();
             stack.Add(go.transform);
