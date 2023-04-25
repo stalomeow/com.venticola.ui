@@ -1,10 +1,32 @@
 # VentiCola UI
 
-一个基于 Unity 和 Universal RP 的 UI 框架，支持 MVC、MVVM 等多种写法。
+一个基于 Unity 和 Universal RP 的 UI 框架，支持 MVC、MVVM 等多种写法，支持 UI 背景模糊。
+
+已验证的 Unity 版本：`2021.3 LTS Windows`。
 
 ## 导入
 
+打开 Package Manager，点击左上角加号，选择 Add package from git URL...，输入 https://github.com/Jin-Yuhan/com.venticola.ui.git 后点击 Add。
+
 ## 配置
+
+（之后有空再配图，现在凌晨三点，困死了...
+
+打开 Project Settings，选择 VentiCola UI，点击 Create Runtime Settings 按钮，创建运行时设置。
+
+创建一个 UIRoot 预制体，并赋值给运行时设置上的 UIRoot 上。该预制体需要包含一个 Screen-Space Camera 类型的 Canvas、一个 UICamera 和一个 EventSystem。可以模仿包目录下的 `Prefabs/UI Root` 来制作。UICamera 的 RenderType 必须是 Overlay，一些没必要开启的渲染选项都可以关闭。
+
+为 UICamera 创建一个新的 Universal Renderer。将 Filtering 中的两个 LayerMask 都设置为 `Nothing`。关闭后处理、阴影等没用的选项。添加名为 Advanced UI Renderer 的 Renderer Feature。新建一个 Layer，起名叫 `Hidden UI`（或者其他 as you like），然后赋值给 Advanced UI Renderer 中的 `Hidden UI Layer` 字段。
+
+UICamera 的 Culling Mask 设置为 `UI` 和 `Hidden UI` 两层。
+
+为 MainCamera 创建一个新的 Universal Renderer。关闭所有能关闭的选项，让它什么都不干。
+
+将两个 Universal Renderer 都加到 Universal Render Pipeline Asset 的 Renderer List 中。
+
+将 UICamera 的 Renderer 设置为你创建的第一个 Renderer。
+
+在运行时设置中，将 Main Camera Renderers 下的 `Light Weight` 设置为你创建的第二个 Renderer。
 
 ## 基本使用
 
