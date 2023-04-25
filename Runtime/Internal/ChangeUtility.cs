@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -5,8 +6,17 @@ namespace VentiCola.UI.Internal
 {
     public static class ChangeUtility
     {
-        private static readonly Stack<IChangeObserver> s_ObserverStack = new();
         private static int s_DisableNotification = 0;
+        private static readonly Stack<IChangeObserver> s_ObserverStack = new();
+        private static readonly Action<IChangeObserver> s_NotifyAction = (IChangeObserver ob) =>
+        {
+            if (ReferenceEquals(ob, CurrentObserver))
+            {
+                return;
+            }
+
+            ob.NotifyChanged();
+        };
 
         /// <summary>
         /// 获取当前的观察者。如果没有，则返回 null。
@@ -86,17 +96,7 @@ namespace VentiCola.UI.Internal
                 return;
             }
 
-            var currentOb = CurrentObserver;
-
-            foreach (IChangeObserver observer in observers)
-            {
-                if (ReferenceEquals(observer, currentOb))
-                {
-                    continue;
-                }
-
-                observer.NotifyChanged();
-            }
+            observers.ForEach(s_NotifyAction);
         }
     }
 }

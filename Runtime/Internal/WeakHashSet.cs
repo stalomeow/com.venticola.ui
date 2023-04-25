@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -7,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace VentiCola.UI.Internal
 {
-    internal sealed class WeakHashSetDebugView<T> where T : class, IVersionable
+    internal sealed class WeakHashSetDebugView<T> where T : class
     {
         private readonly WeakHashSet<T> m_HashSet;
 
@@ -19,7 +18,12 @@ namespace VentiCola.UI.Internal
         [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
         public T[] Items
         {
-            get => System.Linq.Enumerable.ToArray(m_HashSet);
+            get
+            {
+                var temp = new List<T>();
+                m_HashSet.ForEach(x => temp.Add(x));
+                return temp.ToArray();
+            }
         }
     }
 
@@ -28,128 +32,8 @@ namespace VentiCola.UI.Internal
     /// </summary>
     /// <typeparam name="T">集合元素的类型。</typeparam>
     [DebuggerTypeProxy(typeof(WeakHashSetDebugView<>))]
-    public class WeakHashSet<T> : IEnumerable<T> where T : class
+    public class WeakHashSet<T> where T : class
     {
-        public struct Enumerator : IEnumerator<T>
-        {
-            private readonly int m_Version;
-            private WeakHashSet<T> m_HashSet;
-            private int m_BucketIndex;
-            private int m_EntryIndex;
-            private int m_PrevEntryIndex;
-            private T m_Current; // hold a strong reference here
-            private bool m_IsEnd;
-
-            public Enumerator(WeakHashSet<T> hashSet)
-            {
-                m_Version = hashSet.m_Version;
-                m_HashSet = hashSet;
-                m_BucketIndex = -2; // -2 means not started
-                m_EntryIndex = -2; // -2 means not started
-                m_PrevEntryIndex = -2;
-                m_Current = null;
-                m_IsEnd = false;
-            }
-
-            public T Current
-            {
-                get
-                {
-                    DoCollectionCheck();
-
-                    if (m_BucketIndex < 0)
-                    {
-                        throw new InvalidOperationException();
-                    }
-
-                    if (m_IsEnd)
-                    {
-                        throw new InvalidOperationException();
-                    }
-
-                    return m_Current;
-                }
-            }
-
-            public bool MoveNext()
-            {
-                DoCollectionCheck();
-
-                if (m_IsEnd)
-                {
-                    throw new InvalidOperationException();
-                }
-
-                if (m_BucketIndex < 0)
-                {
-                    m_BucketIndex = 0;
-                }
-
-                while (m_BucketIndex < m_HashSet.m_Buckets.Length)
-                {
-                    ref int bucket = ref m_HashSet.m_Buckets[m_BucketIndex];
-
-                    if (m_EntryIndex < -1)
-                    {
-                        m_EntryIndex = bucket - 1;
-                        m_PrevEntryIndex = -1;
-                    }
-
-                    while (m_EntryIndex >= 0)
-                    {
-                        ref Entry entry = ref m_HashSet.m_Entries[m_EntryIndex];
-
-                        if (TryGetGCHandleTarget(entry.Handle, out m_Current))
-                        {
-                            m_PrevEntryIndex = m_EntryIndex;
-                            m_EntryIndex = entry.Next;
-                            return true;
-                        }
-                        else
-                        {
-                            int nextEntryIndex = entry.Next;
-
-                            m_HashSet.FreeEntry(ref bucket, m_EntryIndex, m_PrevEntryIndex);
-
-                            // shouldn't change m_PrevEntryIndex here
-                            m_EntryIndex = nextEntryIndex;
-                        }
-                    }
-
-                    m_BucketIndex++;
-                    m_EntryIndex = -2;
-                }
-
-                m_IsEnd = true;
-                return false;
-            }
-
-            public void Dispose()
-            {
-                DoCollectionCheck();
-
-                m_HashSet = null;
-                m_Current = null; // remove strong reference
-            }
-
-            private void DoCollectionCheck()
-            {
-                if (m_HashSet is null)
-                {
-                    throw new ObjectDisposedException(nameof(WeakHashSet<T>));
-                }
-
-                if (m_HashSet.m_Version != m_Version)
-                {
-                    throw new InvalidOperationException("Modify collection while enumerating it.");
-                }
-            }
-
-            object IEnumerator.Current => Current;
-
-            public void Reset() => throw new NotSupportedException();
-        }
-
         private struct Entry
         {
             public GCHandle Handle; // 这里不直接用 WeakReference，它有额外的开销
@@ -246,9 +130,53 @@ namespace VentiCola.UI.Internal
             m_Version++;
         }
 
-        public Enumerator GetEnumerator()
+        // DO NOT modify collection in ForEach
+        // DO NOT call ForEach in ForEach
+        public void ForEach(Action<T> action)
         {
-            return new Enumerator(this);
+            if (action is null)
+            {
+                return;
+            }
+
+            int version = m_Version;
+            uint length = (uint)m_Buckets.Length;
+
+            for (uint i = 0; i < length; i++)
+            {
+                ref int bucket = ref m_Buckets[i];
+                int entryIndex = bucket - 1;
+                int prevEntryIndex = -1;
+
+                while (entryIndex >= 0)
+                {
+                    ref Entry entry = ref m_Entries[entryIndex];
+
+                    if (TryGetGCHandleTarget(entry.Handle, out T value))
+                    {
+                        action(value);
+
+                        if (m_Version != version)
+                        {
+                            throw new InvalidOperationException("Collection was modified when being iterated!");
+                        }
+
+                        prevEntryIndex = entryIndex;
+                        entryIndex = entry.Next;
+                    }
+                    else
+                    {
+                        int nextEntryIndex = entry.Next;
+
+                        FreeEntry(ref bucket, entryIndex, prevEntryIndex);
+
+                        // shouldn't change prevEntryIndex here
+                        entryIndex = nextEntryIndex;
+                        version++;
+                        m_Version++;
+                    }
+                }
+            }
         }
 
         private int GetNewEntryIndex(uint hashCode, ref int bucket, ref uint bucketIndex)
@@ -403,9 +331,5 @@ namespace VentiCola.UI.Internal
 
             return (value is not null);
         }
-
-        IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
