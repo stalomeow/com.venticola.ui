@@ -6,7 +6,7 @@ using VentiCola.UI.Specialized;
 
 namespace VentiColaTests.UI
 {
-    public class Test : MonoBehaviour
+    public class Advanced : MonoBehaviour
     {
         [SerializeField] private Button CharButton;
         [SerializeField] private Button AlertButton;
@@ -15,7 +15,7 @@ namespace VentiColaTests.UI
         {
             Application.targetFrameRate = 120;
 
-            var yingTalents = new ReactiveList<TestTalentModel>()
+            var yingTalents = new ReactiveList<TalentModel>()
             {
                 new()
                 {
@@ -48,7 +48,7 @@ namespace VentiColaTests.UI
                     IconPath = "ying_talent_4"
                 }
             };
-            TestCharDB.Characters = new ReactiveList<TestCharacterModel>
+            CharacterModel.Characters = new ReactiveList<CharacterModel>
             {
                 new()
                 {
@@ -84,13 +84,14 @@ namespace VentiColaTests.UI
                     LoveMaxExp = 1000,
                     Desc = "？？？？？",
                     AvatarPath = "unknown",
-                    Talents = new ReactiveList<TestTalentModel>()
+                    Talents = new ReactiveList<TalentModel>()
                 }
             };
 
             CharButton.onClick.AddListener(() => ShowCharPanel());
             AlertButton.onClick.AddListener(() => ShowAlert());
 
+            // 立刻初始化，生成一个 Event System
             Singleton<ResourcesUIManager>.Instance.PrepareEnvironment();
         }
 
@@ -98,7 +99,7 @@ namespace VentiColaTests.UI
         {
             if (Input.GetKeyDown(KeyCode.C))
             {
-                ShowAlert();
+                ShowCharPanel();
             }
 
             if (Input.GetKeyDown(KeyCode.A))
@@ -114,20 +115,27 @@ namespace VentiColaTests.UI
 
         private void ShowCharPanel()
         {
-            var controller = Singleton<TestComplexPageController>.Instance;
+            // 该页面全局唯一
+            var controller = Singleton<CharPanelPageController>.Instance;
+
+            if (controller.State is UIState.Active)
+            {
+                return; // 已经在显示了
+            }
+
             controller.CurrentTab = TabType.Talent;
-            controller.CurrentChar = TestCharDB.Characters[0];
+            controller.CurrentChar = CharacterModel.Characters[0];
             Singleton<ResourcesUIManager>.Instance.Show(controller);
         }
 
         private void ShowAlert()
         {
-            Singleton<ResourcesUIManager>.Instance.Show(new TestAlertBoxPageController
+            Singleton<ResourcesUIManager>.Instance.Show(new AlertBoxPageController
             {
                 Title = "The Hippocratic Oath",
                 Message = "　　I swear by Apollo the physician, by Aesculapius, Hygeia, and Panacea, and I take to witness all the gods, all the goddesses, to keep according to my ability and my judgement the following oath.\n　　To consider dear to me as my parents him who taught me this art, to live in common with him, and if necessary to share my goods with him, to look upon him children as my own brothers, to teach them this art if they so desire without fee or written promise, to impart to my sons and the sons of the master who taught me and the disciples who have enrolled themselves and have agreed to the rules of the profession, but to these alone, the precepts and the instruction.\n　　I will prescribe regimen for the good of my patients according to my ability and my judgement and never do harm to anyone. To please no one will I prescribe a deadly drug, nor give advice which may cause his death. Nor will I give a woman a pessary to procure abortion. But I will preserve the purity of my life and my art. I will not cut for stone, even for patients in whom the disease is manifest. I will leave this operation to be performed by practitioners （specialist in this art）. In every house where I come I will enter only for the good of my patients, keeping myself far from all intentional ill-doing and all seduction. All that may come to my knowledge in the exercise of my profession or in daily commerce with men, which ought not to be spread abroad, I will keep secret and will never reveal it.\n　　If I keep this oath faithfully, may I enjoy my life and practice my art, respected by all men and in all times, but if I swerve from it or violate it, may the reverse be my lot.",
-                OnConfirm = () => print("OK"),
-                OnCancel = () => print("???"),
+                OnConfirm = () => print("Yes"),
+                OnCancel = () => print("No"),
             });
         }
     }

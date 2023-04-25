@@ -60,6 +60,24 @@ namespace VentiCola.UI.Bindings
         }
 
         /// <summary>
+        /// 创建一条二阶贝塞尔缓动曲线
+        /// </summary>
+        /// <param name="p1">控制点，x 坐标必须在 [0, 1] 范围内</param>
+        /// <exception cref="ArgumentOutOfRangeException">控制点的 x 坐标不在范围内</exception>
+        public EasingCurve((float x, float y) p1)
+        {
+            if (p1.x is not (>= 0 and <= 1))
+            {
+                throw new ArgumentOutOfRangeException(nameof(p1), "The x component of bezier control point must be in range [0, 1].");
+            }
+
+            m_Type = EasingCurveType.QuadraticBezier;
+            m_Curve = null;
+            m_ControlPoint1 = new Vector2(p1.x, p1.y);
+            m_ControlPoint2 = Vector2.zero;
+        }
+
+        /// <summary>
         /// 创建一条三阶贝塞尔缓动曲线
         /// </summary>
         /// <param name="p1">控制点 1，x 坐标必须在 [0, 1] 范围内</param>
@@ -81,6 +99,30 @@ namespace VentiCola.UI.Bindings
             m_Curve = null;
             m_ControlPoint1 = p1;
             m_ControlPoint2 = p2;
+        }
+
+        /// <summary>
+        /// 创建一条三阶贝塞尔缓动曲线
+        /// </summary>
+        /// <param name="p1">控制点 1，x 坐标必须在 [0, 1] 范围内</param>
+        /// <param name="p2">控制点 2，x 坐标必须在 [0, 1] 范围内</param>
+        /// <exception cref="ArgumentOutOfRangeException">某一个控制点的 x 坐标不在范围内</exception>
+        public EasingCurve((float x, float y) p1, (float x, float y) p2)
+        {
+            if (p1.x is not (>= 0 and <= 1))
+            {
+                throw new ArgumentOutOfRangeException(nameof(p1), "The x component of bezier control point must be in range [0, 1].");
+            }
+
+            if (p2.x is not (>= 0 and <= 1))
+            {
+                throw new ArgumentOutOfRangeException(nameof(p2), "The x component of bezier control point must be in range [0, 1].");
+            }
+
+            m_Type = EasingCurveType.CubicBezier;
+            m_Curve = null;
+            m_ControlPoint1 = new Vector2(p1.x, p1.y);
+            m_ControlPoint2 = new Vector2(p2.x, p2.y);
         }
 
         /// <summary>

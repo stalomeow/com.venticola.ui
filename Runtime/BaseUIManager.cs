@@ -83,6 +83,9 @@ namespace VentiCola.UI
             };
         }
 
+        /// <summary>
+        /// 主摄像机
+        /// </summary>
         public Camera MainCamera
         {
             get => m_MainCamera;
@@ -110,6 +113,14 @@ namespace VentiCola.UI
                     cameraStack.Add(m_UICamera);
                 }
             }
+        }
+
+        /// <summary>
+        /// UI 摄像机
+        /// </summary>
+        public Camera UICamera
+        {
+            get => m_UICamera;
         }
 
         protected virtual void OnLRUViewEliminated(string prefabKey, GameObject viewInstance)
@@ -176,8 +187,15 @@ namespace VentiCola.UI
             MakeTypeAnimatable<Quaternion>(Quaternion.LerpUnclamped);
         }
 
-        public void PrepareEnvironment() { } // empty method
+        /// <summary>
+        /// 空方法。在某些情况下用于显式初始化 UIManager
+        /// </summary>
+        public void PrepareEnvironment() { }
 
+        /// <summary>
+        /// 显示指定的页面
+        /// </summary>
+        /// <param name="controller"></param>
         public void Show(IViewController controller)
         {
             switch (controller.State)
@@ -504,16 +522,24 @@ namespace VentiCola.UI
             }
         }
 
+        /// <summary>
+        /// 关闭最上层的页面
+        /// </summary>
         public void CloseTop()
         {
-            if (m_ViewStack.Count > 0)
+            if (m_ViewStack.Count <= 0)
             {
-                CloseLastNoCheck();
+                return;
             }
 
+            CloseLastNoCheck();
             UpdateRendererBlurOptionAndRerender();
         }
 
+        /// <summary>
+        /// 关闭指定的页面以及之上的所有页面
+        /// </summary>
+        /// <param name="controller"></param>
         public void Close(IViewController controller)
         {
             if (controller.State is (UIState.Closing or UIState.Closed))
@@ -531,8 +557,16 @@ namespace VentiCola.UI
             UpdateRendererBlurOptionAndRerender();
         }
 
+        /// <summary>
+        /// 关闭所有的页面
+        /// </summary>
         public void CloseAll()
         {
+            if (m_ViewStack.Count <= 0)
+            {
+                return;
+            }
+
             while (m_ViewStack.Count > 0)
             {
                 CloseLastNoCheck();
@@ -606,6 +640,11 @@ namespace VentiCola.UI
             SetGameObjectParent(viewInstance, m_UIPoolRoot, false);
         }
 
+        /// <summary>
+        /// 使 <typeparamref name="T"/> 类型可以被应用动画（可以被插值）
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="interpolateFunction"></param>
         public void MakeTypeAnimatable<T>(InterpolateFunction<T> interpolateFunction)
         {
             InterpolationCache<T>.InterpolateFunc = interpolateFunction;
@@ -649,8 +688,18 @@ namespace VentiCola.UI
             ListPool<Transform>.Release(stack);
         }
 
+        /// <summary>
+        /// 对接资源管理系统，用于加载 UI 预制体
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="callback">在加载完成后调用，传入的参数分别为 <paramref name="key"/> 和加载出的 prefab。如果 prefab 为 null 则视为加载失败</param>
         protected abstract void LoadPrefabAsync(string key, Action<string, GameObject> callback);
 
+        /// <summary>
+        /// 对接资源管理系统，用于释放 UI 预制体
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="prefab"></param>
         protected abstract void ReleasePrefab(string key, GameObject prefab);
     }
 }

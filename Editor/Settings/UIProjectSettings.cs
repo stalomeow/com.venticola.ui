@@ -8,7 +8,7 @@ namespace VentiColaEditor.UI.Settings
     public sealed class UIProjectSettings : ScriptableSingleton<UIProjectSettings>
     {
         [SerializeField] private bool m_AutoCodeInjection = true;
-        [SerializeField] private bool m_EnableCodeInjectionLog = true;
+        [SerializeField] private bool m_EnableCodeInjectionLog = false; // 默认 false，这样就像什么都没发生过一样~
         [SerializeField] private List<string> m_CodeInjectionAssemblyWhiteList = new()
         {
             "Assembly-CSharp",

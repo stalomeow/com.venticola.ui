@@ -7,10 +7,10 @@ using VentiCola.UI.Bindings;
 
 namespace VentiColaTests.UI
 {
-    public class TestAlertBoxPage : BaseUIPageView, IPointerClickHandler
+    public class AlertBoxPage : BaseUIPageView, IPointerClickHandler
     {
         [Header("Components")]
-        public RectTransform BoxTransfrom;
+        public RectTransform BoxTransform;
 
         public Text TitleText;
         public Text MessageText;

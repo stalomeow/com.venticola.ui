@@ -8,13 +8,16 @@ using VentiCola.UI.Internal;
 
 namespace VentiCola.UI
 {
-    public abstract class BaseUIPageControllerComplex<T> : IViewController, IAnimationUpdater where T : BaseUIPageView
+    public abstract class BaseUIPageControllerComplex<TView> : IViewController, IAnimationUpdater where TView : BaseUIPageView
     {
+        /// <summary>
+        /// 页面的配置信息
+        /// </summary>
         protected UIConfig Config;
 
         private UIState m_State;
         private int m_StackIndex;
-        private T m_View;
+        private TView m_View;
         private List<IAnimatable> m_Animatables;
         private bool m_HasExternalAnimations;
         private RootBinding m_ViewBindingRoot;
@@ -23,13 +26,17 @@ namespace VentiCola.UI
 
         protected BaseUIPageControllerComplex() { }
 
-        protected UIState State => m_State;
+        /// <summary>
+        /// 页面的状态
+        /// </summary>
+        public UIState State => m_State;
 
-        protected T View => m_View;
+        /// <summary>
+        /// 页面视图
+        /// </summary>
+        protected TView View => m_View;
 
         ref readonly UIConfig IViewController.Config => ref Config;
-
-        UIState IViewController.State => m_State;
 
         int IViewController.StackIndex => m_StackIndex;
 
@@ -49,7 +56,7 @@ namespace VentiCola.UI
 
         void IViewController.InitView(GameObject viewInstance)
         {
-            m_View = viewInstance.GetComponent<T>();
+            m_View = viewInstance.GetComponent<TView>();
             m_Animatables = ListPool<IAnimatable>.Get();
             m_HasExternalAnimations = false;
 
@@ -95,11 +102,6 @@ namespace VentiCola.UI
 
         void IAnimationUpdater.RequestAnimationUpdate(IAnimatable animatable)
         {
-            if (m_Animatables.Contains(animatable))
-            {
-                return;
-            }
-
             StartAnimatable(animatable);
         }
 
@@ -235,21 +237,36 @@ namespace VentiCola.UI
             NotifyViewChanged();
         }
 
+        /// <summary>
+        /// 开始更新一个可动画对象上的动画
+        /// </summary>
+        /// <param name="animatable"></param>
         protected void StartAnimatable(IAnimatable animatable)
         {
+            if (m_Animatables.Contains(animatable))
+            {
+                return;
+            }
+
             m_Animatables.Add(animatable);
         }
 
+        /// <summary>
+        /// 停止所有可动画对象
+        /// </summary>
         protected void StopAllAnimatables()
         {
             m_Animatables.Clear();
         }
 
-        protected void DebugLogBindings()
+        /// <summary>
+        /// 将页面上所有的绑定信息都打印到控制台
+        /// </summary>
+        protected void PrintBindingsToConsole()
         {
-            Debug.Log("---------------------------- Binding Start ----------------------------");
+            Debug.Log("---------------------------- Binding Start ----------------------------", m_View);
             DFS(m_ViewBindingRoot, 0);
-            Debug.Log("----------------------------  Binding End  ----------------------------");
+            Debug.Log("----------------------------  Binding End  ----------------------------", m_View);
 
             static void DFS(BaseBinding binding, int depth)
             {
@@ -262,55 +279,102 @@ namespace VentiCola.UI
             }
         }
 
+        /// <summary>
+        /// 开启一个协程
+        /// </summary>
+        /// <param name="routine"></param>
+        /// <returns></returns>
+        /// <seealso cref="MonoBehaviour.StartCoroutine(IEnumerator)"/>
         protected Coroutine StartCoroutine(IEnumerator routine)
         {
             return m_View.StartCoroutine(routine);
         }
 
+        /// <summary>
+        /// 停止指定的协程
+        /// </summary>
+        /// <param name="routine"></param>
+        /// <seealso cref="MonoBehaviour.StopCoroutine(Coroutine)"/>
         protected void StopCoroutine(Coroutine routine)
         {
             m_View.StopCoroutine(routine);
         }
 
+        /// <summary>
+        /// 停止所有正在执行的协程
+        /// </summary>
+        /// <seealso cref="MonoBehaviour.StopAllCoroutines"/>
         protected void StopAllCoroutines()
         {
             m_View.StopAllCoroutines();
         }
 
+        /// <summary>
+        /// 通知当前页面发生了变化
+        /// </summary>
         protected void NotifyViewChanged()
         {
             m_ViewChangedCallback?.Invoke(this);
         }
 
         /// <summary>
-        /// 在这里分配资源
+        /// 页面视图加载完成后调用。可以在这里分配资源
         /// </summary>
         protected virtual void OnViewDidLoad() { }
 
+        /// <summary>
+        /// 页面被打开时调用
+        /// </summary>
         protected virtual void OnOpen() { }
 
+        /// <summary>
+        /// 页面被暂停时调用
+        /// </summary>
         protected virtual void OnPause() { }
 
+        /// <summary>
+        /// 页面被恢复时调用
+        /// </summary>
         protected virtual void OnResume() { }
 
+        /// <summary>
+        /// 页面被关闭时调用
+        /// </summary>
         protected virtual void OnClose() { }
 
         /// <summary>
-        /// 在这里释放资源，不能再使用 View 了
+        /// 页面视图即将被释放时调用。可以在这里释放资源
         /// </summary>
         protected virtual void OnViewWillUnload() { }
 
+        /// <summary>
+        /// Update，只有页面处于活跃状态时才会被调用
+        /// </summary>
         protected virtual void OnUpdate() { }
 
+        /// <summary>
+        /// LateUpdate，只有页面处于活跃状态时才会被调用
+        /// </summary>
         protected virtual void OnLateUpdate() { }
 
+        /// <summary>
+        /// 用于初始化页面绑定
+        /// </summary>
         protected virtual void SetUpViewBindings() { }
 
+        /// <summary>
+        /// 用于检查外部动画的运行状态，例如 <see cref="Animator"/>。该方法每帧都会调用一次
+        /// </summary>
+        /// <param name="hasExternalAnimations">一个 bool 值，指示是否还有外部动画。如果所有外部动画都执行结束，设置为 false，否则设置为 true</param>
         protected virtual void UpdateExternalAnimations(out bool hasExternalAnimations)
         {
             hasExternalAnimations = false;
         }
 
+        /// <summary>
+        /// 在页面关闭的过程中，每帧的末尾都会调用一次。返回值指示当前页面是否可以结束关闭
+        /// </summary>
+        /// <returns>如果允许页面结束关闭，返回 true，否则返回 false</returns>
         protected virtual bool CanFinishClosing()
         {
             return true;

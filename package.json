@@ -1,6 +1,6 @@
 {
   "name": "com.venticola.ui",
-  "version": "0.5.3-preview",
+  "version": "0.6.0-preview",
   "displayName": "VentiCola UI",
   "description": "A UI framework for Unity.",
   "unity": "2021.3",
@@ -9,5 +9,17 @@
     "com.unity.nuget.mono-cecil": "1.10.2",
     "com.unity.render-pipelines.core": "12.1.10",
     "com.unity.render-pipelines.universal": "12.1.10"
-  }
+  },
+  "samples": [
+    {
+      "displayName": "Hello World",
+      "description": "Shows the basic use of this package.",
+      "path": "Samples~/HelloWorld"
+    },
+    {
+      "displayName": "Advanced",
+      "description": "Contains a more advanced sample with two complex pages.",
+      "path": "Samples~/Advanced"
+    }
+  ]
 }

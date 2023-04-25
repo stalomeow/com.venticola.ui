@@ -5,7 +5,7 @@ using VentiCola.UI.Specialized;
 
 namespace VentiColaTests.UI
 {
-    public class TestAlertBoxPageController : BaseUIPageController<TestAlertBoxPage>
+    public class AlertBoxPageController : BaseUIPageController<AlertBoxPage>
     {
         // only expose parameters
 
@@ -26,15 +26,15 @@ namespace VentiColaTests.UI
         public UnityAction OnCancel { get; set; }
 
         [Reactive]
-        private float PageAlpha { get; set; } = 0;
+        private float PageAlpha { get; set; } = 0; // 默认值
 
         [Reactive]
-        private float BoxPositionY { get; set; } = -20;
+        private float BoxPositionY { get; set; } = -20; // 默认值
 
-        public TestAlertBoxPageController()
+        public AlertBoxPageController()
         {
-            Config.PrefabKey = "Test Alert Box";
-            Config.RenderOption = UIRenderOption.FullScreenBlurDynamic;
+            Config.PrefabKey = "AlertBoxPage";
+            Config.RenderOption = UIRenderOption.FullScreenBlurStatic;
             Config.IsAdditive = true;
         }
 
@@ -71,7 +71,7 @@ namespace VentiColaTests.UI
         protected override void SetUpViewBindings()
         {
             View.canvasGroup.alpha(() => PageAlpha, in View.AlphaTransConfig);
-            View.BoxTransfrom.anchoredPositionY(() => BoxPositionY, in View.PositionTransConfig);
+            View.BoxTransform.anchoredPositionY(() => BoxPositionY, in View.PositionTransConfig);
 
             View.TitleText.text(() => Title);
             View.MessageText.text(() => Message);

@@ -33,44 +33,67 @@ namespace VentiCola.UI.Bindings.Experimental
 
         public void Clear()
         {
-            throw new NotImplementedException();
+            m_Items.Clear();
+            ChangeUtility.TryNotify(m_Observers);
         }
 
         public bool Contains(T item)
         {
-            throw new NotImplementedException();
+            ChangeUtility.TryAddCurrentObserver(ref m_Observers);
+            return m_Items.Contains(item);
         }
 
         public void CopyTo(T[] array, int arrayIndex)
         {
-            throw new NotImplementedException();
+            ChangeUtility.TryAddCurrentObserver(ref m_Observers);
+            m_Items.CopyTo(array, arrayIndex);
         }
 
         public bool Remove(T item)
         {
-            throw new NotImplementedException();
+            if (m_Items.Remove(item))
+            {
+                ChangeUtility.TryNotify(m_Observers);
+                return true;
+            }
+
+            return false;
         }
 
         public int Count
         {
-            get => m_Items.Count;
+            get
+            {
+                ChangeUtility.TryAddCurrentObserver(ref m_Observers);
+                return m_Items.Count;
+            }
         }
 
-        public bool IsReadOnly { get; }
+        bool ICollection<T>.IsReadOnly
+        {
+            get
+            {
+                ChangeUtility.TryAddCurrentObserver(ref m_Observers);
+                return ((IList<T>)m_Items).IsReadOnly;
+            }
+        }
 
         public int IndexOf(T item)
         {
-            throw new NotImplementedException();
+            ChangeUtility.TryAddCurrentObserver(ref m_Observers);
+            return m_Items.IndexOf(item);
         }
 
         public void Insert(int index, T item)
         {
-            throw new NotImplementedException();
+            m_Items.Insert(index, item);
+            ChangeUtility.TryNotify(m_Observers);
         }
 
         public void RemoveAt(int index)
         {
-            throw new NotImplementedException();
+            m_Items.RemoveAt(index);
+            ChangeUtility.TryNotify(m_Observers);
         }
 
         public T this[int index]
@@ -93,14 +116,6 @@ namespace VentiCola.UI.Bindings.Experimental
                 ChangeUtility.TryNotify(m_Observers);
             }
         }
-
-        int IReactiveCollection.Count => m_Items.Count;
-
-        // bool IReactiveCollection.HasKey => false;
-        //
-        // Type IReactiveCollection.KeyType => throw new NotSupportedException();
-        //
-        // Type IReactiveCollection.ValueType => typeof(T);
 
         T1 IReactiveCollection.GetKeyAt<T1>(Index index)
         {
@@ -130,9 +145,15 @@ namespace VentiCola.UI.Bindings.Experimental
             }
         }
 
-        public IEnumerator<T> GetEnumerator()
+        List<T>.Enumerator GetEnumerator()
         {
-            throw new NotImplementedException();
+            ChangeUtility.TryAddCurrentObserver(ref m_Observers);
+            return m_Items.GetEnumerator();
+        }
+
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
+        {
+            return GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()

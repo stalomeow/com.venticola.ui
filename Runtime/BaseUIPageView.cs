@@ -14,6 +14,8 @@ namespace VentiCola.UI
 
         protected BaseUIPageView() { }
 
+        protected IViewController Controller => m_Controller;
+
 #pragma warning disable IDE1006 // Naming Styles
 
         public Canvas canvas => m_Canvas;

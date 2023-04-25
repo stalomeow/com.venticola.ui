@@ -7,27 +7,108 @@ using VentiCola.UI.Specialized;
 
 namespace VentiColaTests.UI
 {
-    public class TestComplexPageController : BaseUIPageController<TestComplexPage>
+    public enum TabType
     {
-        private SharedValue<TransitionConfig> m_ExpBarFillAmountSharedTransConfig = new();
+        Properties,
+        Weapon,
+        Talent,
+        Info
+    }
 
+    public class TalentModel
+    {
+        [Reactive]
+        public string Name { get; set; }
+
+        [Reactive]
+        public int Level { get; set; }
+
+        [Reactive]
+        public string IconPath { get; set; }
+
+        [Reactive(LazyComputed = true)]
+        public Sprite Icon => Resources.Load<Sprite>(IconPath);
+    }
+
+    public class CharacterModel
+    {
+        [Reactive]
+        public static ReactiveList<CharacterModel> Characters { get; set; }
+
+        [Reactive]
+        public string Name { get; set; }
+
+        [Reactive]
+        public string ElementType { get; set; }
+
+        [Reactive]
+        public int Level { get; set; }
+
+        [Reactive]
+        public int MaxLevel { get; set; }
+
+        [Reactive]
+        public int Exp { get; set; }
+
+        [Reactive]
+        public int MaxExp { get; set; }
+
+        [Reactive]
+        public int MaxHp { get; set; }
+
+        [Reactive]
+        public int ATK { get; set; }
+
+        [Reactive]
+        public int DEF { get; set; }
+
+        [Reactive]
+        public int LoveLevel { get; set; }
+
+        [Reactive]
+        public int LoveExp { get; set; }
+
+        [Reactive]
+        public int LoveMaxExp { get; set; }
+
+        [Reactive]
+        public string Desc { get; set; }
+
+        [Reactive]
+        public string AvatarPath { get; set; }
+
+        [Reactive]
+        public ReactiveList<TalentModel> Talents { get; set; }
+
+        [Reactive(LazyComputed = true)]
+        public float ExpBarFillAmount => (float)Exp / MaxExp;
+
+        [Reactive(LazyComputed = true)]
+        public float LoveExpBarFillAmount => (float)LoveExp / LoveMaxExp;
+
+        [Reactive(LazyComputed = true)]
+        public Sprite Avatar => Resources.Load<Sprite>(AvatarPath);
+    }
+
+    public class CharPanelPageController : BaseUIPageController<CharPanelPage>
+    {
         [Reactive]
         public TabType CurrentTab { get; set; }
 
         [Reactive]
-        public TestCharacterModel CurrentChar { get; set; }
+        public CharacterModel CurrentChar { get; set; }
 
         [Reactive]
-        private float PageAlpha { get; set; } = 0;
+        private float PageAlpha { get; set; } = 0; // 默认值
 
-        public TestComplexPageController()
+        public CharPanelPageController()
         {
-            Config.PrefabKey = "Test Complex UI";
+            Config.PrefabKey = "CharPanelPage";
         }
 
         private void OnDrag(PointerEventData eventData)
         {
-            Transform character = GameObject.Find("ying_with_physics").transform;
+            Transform character = GameObject.FindWithTag("Player").transform;
             character.Rotate(new Vector3(0, eventData.delta.x * -0.5f, 0));
         }
 
@@ -39,54 +120,16 @@ namespace VentiColaTests.UI
             }
 
             CurrentTab = tab;
-            Debug.Log(tab);
 
-            var go = GameObject.Find("ying_with_physics");
-            var animator = go.GetComponent<Animator>();
-            var renderer = go.GetComponentInChildren<SkinnedMeshRenderer>();
-
-            if (tab == TabType.Properties)
+            var playerRenderer = GameObject.FindWithTag("Player").GetComponent<MeshRenderer>();
+            playerRenderer.material.color = tab switch
             {
-                animator.SetInteger("animBaseInt", 7);
-                renderer.SetBlendShapeWeight(16, 100);
-                renderer.SetBlendShapeWeight(25, 100);
-            }
-            else
-            {
-                renderer.SetBlendShapeWeight(16, 0);
-                renderer.SetBlendShapeWeight(25, 0);
-            }
-
-            if (tab == TabType.Talent)
-            {
-                animator.SetInteger("animBaseInt", 5);
-            }
-
-            if (tab == TabType.Weapon)
-            {
-                animator.SetInteger("animBaseInt", 3);
-                renderer.SetBlendShapeWeight(33, 40);
-                renderer.SetBlendShapeWeight(41, 100);
-            }
-            else
-            {
-                renderer.SetBlendShapeWeight(33, 0);
-                renderer.SetBlendShapeWeight(41, 0);
-            }
-
-            if (tab == TabType.Info)
-            {
-                animator.SetInteger("animBaseInt", 2);
-                renderer.SetBlendShapeWeight(3, 100);
-                renderer.SetBlendShapeWeight(30, 100);
-                renderer.SetBlendShapeWeight(40, 100);
-            }
-            else
-            {
-                renderer.SetBlendShapeWeight(3, 0);
-                renderer.SetBlendShapeWeight(30, 0);
-                renderer.SetBlendShapeWeight(40, 0);
-            }
+                TabType.Properties => Color.blue,
+                TabType.Weapon => Color.green,
+                TabType.Talent => Color.red,
+                TabType.Info => Color.black,
+                _ => throw new System.NotImplementedException(),
+            };
         }
 
         protected override void OnViewDidLoad()
@@ -133,13 +176,12 @@ namespace VentiColaTests.UI
         protected override void OnViewAppear()
         {
             PageAlpha = 1;
-            // View.Animator.SetTrigger("Open");
+            SwitchTab(true, CurrentTab); // 第一次只能手动调用
         }
 
         protected override void OnViewDisappear()
         {
             PageAlpha = 0;
-            // View.Animator.SetTrigger("Close");
         }
 
         protected override void SetUpViewBindings()
@@ -155,7 +197,7 @@ namespace VentiColaTests.UI
                 View.CharNameText.text(() => CurrentChar.Name);
                 View.CharLevelText.text(() => $"等级{CurrentChar.Level} / {CurrentChar.MaxLevel}");
 
-                View.CharExpBarInnerImage.fillAmount(() => CurrentChar.ExpBarFillAmount, m_ExpBarFillAmountSharedTransConfig);
+                View.CharExpBarInnerImage.fillAmount(() => CurrentChar.ExpBarFillAmount, View.ExpBarFillAmountTransConfig);
                 View.CharExpBarLabelText.text(() => $"{CurrentChar.Exp} / {CurrentChar.MaxExp}");
 
                 View.CharMaxHPValueText.text(() => CurrentChar.MaxHp.ToString());
@@ -172,7 +214,7 @@ namespace VentiColaTests.UI
 
             View.TalentTab.ShowIf(() => CurrentTab == TabType.Talent, () =>
             {
-                View.TalentItem.RepeatForEachOf(() => CurrentChar.Talents, (int index, TestTalentModel talentModel) =>
+                View.TalentItem.RepeatForEachOf(() => CurrentChar.Talents, (int index, TalentModel talentModel) =>
                 {
                     View.TalentItemNameText.text(() => talentModel.Name);
                     View.TalentItemLevelText.text(() => $"Lv.{talentModel.Level}");
@@ -181,15 +223,13 @@ namespace VentiColaTests.UI
             });
 
             View.InfoTab.ShowIf(() => CurrentTab == TabType.Info);
-
-            m_ExpBarFillAmountSharedTransConfig.Value = View.ExpBarFillAmountTransConfig;
         }
 
         private void BindTopBar()
         {
             View.CharInfoText.text(() => $"{CurrentChar.ElementType}元素 / {CurrentChar.Name}");
 
-            View.CharListItemObj.RepeatForEachOf(() => TestCharDB.Characters, (int index, TestCharacterModel charModel) =>
+            View.CharListItemObj.RepeatForEachOf(() => CharacterModel.Characters, (int index, CharacterModel charModel) =>
             {
                 View.CharListItemImage.sprite(() => charModel.Avatar);
                 View.CharListItemButton.onClick(() => CurrentChar = charModel);
