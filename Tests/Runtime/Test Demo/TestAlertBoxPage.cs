@@ -10,7 +10,6 @@ namespace VentiColaTests.UI
     public class TestAlertBoxPage : BaseUIPageView, IPointerClickHandler
     {
         [Header("Components")]
-        public CanvasGroup PageCanvasGroup;
         public RectTransform BoxTransfrom;
 
         public Text TitleText;

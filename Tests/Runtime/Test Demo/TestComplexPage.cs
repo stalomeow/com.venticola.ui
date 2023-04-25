@@ -96,7 +96,6 @@ namespace VentiColaTests.UI
 
     public class TestComplexPage : BaseUIPageView, IDragHandler
     {
-        public CanvasGroup PageCanvasGroup;
         public Button CloseButton;
 
         [Header("Top Bar")]

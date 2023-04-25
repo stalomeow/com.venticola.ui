@@ -5,7 +5,7 @@ namespace VentiCola.UI.Misc
 {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(CanvasRenderer))]
-    [AddComponentMenu("UI/Empty Graphic")]
+    [AddComponentMenu("UI/Graphic (Empty)")]
     public sealed class EmptyGraphic : Graphic
     {
         public override void SetAllDirty() { }

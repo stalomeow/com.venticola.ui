@@ -147,7 +147,7 @@ namespace VentiColaTests.UI
             BindTopBar();
             BindTabs();
 
-            View.PageCanvasGroup.alpha(() => PageAlpha, in View.PageAlphaTransConfig);
+            View.canvasGroup.alpha(() => PageAlpha, in View.PageAlphaTransConfig);
             View.CloseButton.onClick(() => Singleton<ResourcesUIManager>.Instance.Close(this));
 
             View.PropertiesTab.ShowIf(() => CurrentTab == TabType.Properties, () =>

@@ -70,7 +70,7 @@ namespace VentiColaTests.UI
 
         protected override void SetUpViewBindings()
         {
-            View.PageCanvasGroup.alpha(() => PageAlpha, in View.AlphaTransConfig);
+            View.canvasGroup.alpha(() => PageAlpha, in View.AlphaTransConfig);
             View.BoxTransfrom.anchoredPositionY(() => BoxPositionY, in View.PositionTransConfig);
 
             View.TitleText.text(() => Title);
