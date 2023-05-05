@@ -16,8 +16,6 @@ namespace VentiCola.UI.Bindings.LowLevel.Experimental
             BaseInitialize(ref exactMountTarget, mountTargetIsUnreliable: false, setDirty: false);
 
             m_RawForEachTemplateTransform = rawTemplate.transform;
-
-            exactMountTarget.SetActive(true);
         }
 
         protected override void OnDetach()

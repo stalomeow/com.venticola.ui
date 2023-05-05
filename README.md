@@ -453,7 +453,7 @@ View.OneGameObject.ShowIf(_ => condition, () =>
 ``` c#
 // 需要引入 VentiCola.UI.Bindings.Experimental 命名空间
 // collection 目前只能是 ReactiveList<T> 的实例
-View.OneGameObject.RepeatForEachOf(_ => collection, (int index, ElementType element) =>
+View.OneGameObject.RepeatForEachOf(_ => collection, (ForEachItem<ElementType> item) =>
 {
     // nested bindings
     // 在此处编写 OneGameObject 的子物体上的绑定

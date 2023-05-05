@@ -155,6 +155,32 @@ namespace VentiCola.UI.Bindings.LowLevel
             return m_AllChildren[offset];
         }
 
+        protected void MoveChild(Index index, Index newIndex)
+        {
+            int count = ChildCount;
+            int offset = index.GetOffset(count);
+            int newOffset = newIndex.GetOffset(count);
+
+            if (offset == newOffset)
+            {
+                return;
+            }
+
+            if (offset < 0 || offset >= count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            if (newOffset < 0 || newOffset >= count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(newIndex));
+            }
+
+            BaseBinding child = m_AllChildren[offset];
+            m_AllChildren.RemoveAt(offset);
+            m_AllChildren.Insert(newOffset, child);
+        }
+
         protected void DetachChildren(Range range, Action<BaseBinding> preDetachCallback = null)
         {
             (int offset, int length) = range.GetOffsetAndLength(ChildCount);
