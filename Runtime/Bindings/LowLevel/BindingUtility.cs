@@ -16,9 +16,12 @@ namespace VentiCola.UI.Bindings.LowLevel
 
             public static readonly Action<UniversalBinding> EventInitAction = self =>
             {
+                var component = self.MountTarget.GetComponent<TComponent>();
                 var getter = (Func<TComponent, UnityEvent>)self.CustomArg1;
-                var unityEvent = getter(self.MountTarget.GetComponent<TComponent>());
-                var handler = WrapEventHandler(self, (UnityAction)self.CustomArg2);
+
+                UnityEvent unityEvent = getter(component);
+                UnityAction handler = WrapEventHandler(self, component, (Action<TComponent>)self.CustomArg2);
+
                 unityEvent.AddListener(handler);
 
                 self.CustomArg0 = unityEvent;
@@ -29,6 +32,7 @@ namespace VentiCola.UI.Bindings.LowLevel
             {
                 var unityEvent = (UnityEvent)self.CustomArg0;
                 var handler = (UnityAction)self.CustomArg2;
+
                 unityEvent.RemoveListener(handler);
             };
         }
@@ -37,9 +41,12 @@ namespace VentiCola.UI.Bindings.LowLevel
         {
             public static readonly Action<UniversalBinding> EventInitAction = self =>
             {
+                var component = self.MountTarget.GetComponent<TComponent>();
                 var getter = (Func<TComponent, UnityEvent<TValue>>)self.CustomArg1;
-                var unityEvent = getter(self.MountTarget.GetComponent<TComponent>());
-                var handler = WrapEventHandler(self, (UnityAction<TValue>)self.CustomArg2);
+
+                UnityEvent<TValue> unityEvent = getter(component);
+                UnityAction<TValue> handler = WrapEventHandler(self, component, (Action<TComponent, TValue>)self.CustomArg2);
+
                 unityEvent.AddListener(handler);
 
                 self.CustomArg0 = unityEvent;
@@ -50,6 +57,7 @@ namespace VentiCola.UI.Bindings.LowLevel
             {
                 var unityEvent = (UnityEvent<TValue>)self.CustomArg0;
                 var handler = (UnityAction<TValue>)self.CustomArg2;
+
                 unityEvent.RemoveListener(handler);
             };
 
@@ -57,6 +65,7 @@ namespace VentiCola.UI.Bindings.LowLevel
             {
                 var component = (TComponent)self.CustomArg0;
                 var setter = (Action<TComponent, TValue>)self.CustomArg2;
+
                 setter(component, value);
             };
 
@@ -64,16 +73,16 @@ namespace VentiCola.UI.Bindings.LowLevel
             {
                 var component = (TComponent)self.CustomArg0;
                 var setter = (Action<TComponent, TValue>)self.CustomArg2;
-                var value = (Func<TValue>)self.CustomArg3;
+                var value = (Func<TComponent, TValue>)self.CustomArg3;
 
                 if (self is AnimatedUniversalBinding<TValue> animatedSelf)
                 {
                     var getter = (Func<TComponent, TValue>)self.CustomArg1;
-                    animatedSelf.StartTransition(getter(component), value(), animationUpdater);
+                    animatedSelf.StartTransition(getter(component), value(component), animationUpdater);
                 }
                 else
                 {
-                    setter(component, value());
+                    setter(component, value(component));
                 }
             };
         }
@@ -82,7 +91,7 @@ namespace VentiCola.UI.Bindings.LowLevel
             GameObject mountTarget,
             Func<TComponent, TValue> getter,
             Action<TComponent, TValue> setter,
-            Func<TValue> value) where TComponent : class
+            Func<TComponent, TValue> value) where TComponent : class
         {
             BaseBinding
                 .Allocate<UniversalBinding>()
@@ -98,7 +107,7 @@ namespace VentiCola.UI.Bindings.LowLevel
             GameObject mountTarget,
             Func<TComponent, TValue> getter,
             Action<TComponent, TValue> setter,
-            Func<TValue> value,
+            Func<TComponent, TValue> value,
             in TransitionConfig transitionConfig) where TComponent : class
         {
             var binding = BaseBinding.Allocate<AnimatedUniversalBinding<TValue>>();
@@ -119,7 +128,7 @@ namespace VentiCola.UI.Bindings.LowLevel
             GameObject mountTarget,
             Func<TComponent, TValue> getter,
             Action<TComponent, TValue> setter,
-            Func<TValue> value,
+            Func<TComponent, TValue> value,
             SharedValue<TransitionConfig> transitionConfig) where TComponent : class
         {
             var binding = BaseBinding.Allocate<AnimatedUniversalBinding<TValue>>();
@@ -139,7 +148,7 @@ namespace VentiCola.UI.Bindings.LowLevel
         public static void BindComponentEvent<TComponent>(
             GameObject mountTarget,
             Func<TComponent, UnityEvent> getter,
-            UnityAction handler) where TComponent : class
+            Action<TComponent> handler) where TComponent : class
         {
             BaseBinding
                 .Allocate<UniversalBinding>()
@@ -153,7 +162,7 @@ namespace VentiCola.UI.Bindings.LowLevel
         public static void BindComponentEvent<TComponent, TValue>(
             GameObject mountTarget,
             Func<TComponent, UnityEvent<TValue>> getter,
-            UnityAction<TValue> handler) where TComponent : class
+            Action<TComponent, TValue> handler) where TComponent : class
         {
             BaseBinding
                 .Allocate<UniversalBinding>()
@@ -164,7 +173,10 @@ namespace VentiCola.UI.Bindings.LowLevel
                     customArg2: handler);
         }
 
-        public static UnityAction WrapEventHandler(UniversalBinding self, UnityAction handler)
+        public static UnityAction WrapEventHandler<TComponent>(
+            UniversalBinding self,
+            TComponent component,
+            Action<TComponent> handler) where TComponent : class
         {
             if (handler == null)
             {
@@ -184,7 +196,7 @@ namespace VentiCola.UI.Bindings.LowLevel
 
                 try
                 {
-                    handler();
+                    handler(component);
                 }
                 finally
                 {
@@ -194,14 +206,17 @@ namespace VentiCola.UI.Bindings.LowLevel
             };
         }
 
-        public static UnityAction<T> WrapEventHandler<T>(UniversalBinding self, UnityAction<T> handler)
+        public static UnityAction<TValue> WrapEventHandler<TComponent, TValue>(
+            UniversalBinding self,
+            TComponent component,
+            Action<TComponent, TValue> handler) where TComponent : class
         {
             if (handler == null)
             {
                 return null;
             }
 
-            return (T value) =>
+            return (TValue value) =>
             {
                 // 如果有监听者，很可能是某个 binding 在 render 时导致事件被触发，这时候没必要再调用回调
                 if (ChangeUtility.CurrentObserver is not null)
@@ -214,7 +229,7 @@ namespace VentiCola.UI.Bindings.LowLevel
 
                 try
                 {
-                    handler(value);
+                    handler(component, value);
                 }
                 finally
                 {

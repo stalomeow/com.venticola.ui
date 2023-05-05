@@ -13,19 +13,19 @@ namespace VentiCola.UI.Bindings
         private static readonly Func<Scrollbar, float> s_ValueGetter = (Scrollbar self) => self.value;
         private static readonly Action<Scrollbar, float> s_ValueSetter = (Scrollbar self, float value) => self.value = value;
 
-        public static Scrollbar value(this Scrollbar self, Func<float> value)
+        public static Scrollbar value(this Scrollbar self, Func<Scrollbar, float> value)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_ValueGetter, s_ValueSetter, value);
             return self;
         }
 
-        public static Scrollbar value(this Scrollbar self, Func<float> value, in TransitionConfig transitionConfig)
+        public static Scrollbar value(this Scrollbar self, Func<Scrollbar, float> value, in TransitionConfig transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_ValueGetter, s_ValueSetter, value, in transitionConfig);
             return self;
         }
 
-        public static Scrollbar value(this Scrollbar self, Func<float> value, SharedValue<TransitionConfig> transitionConfig)
+        public static Scrollbar value(this Scrollbar self, Func<Scrollbar, float> value, SharedValue<TransitionConfig> transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_ValueGetter, s_ValueSetter, value, transitionConfig);
             return self;
@@ -37,7 +37,7 @@ namespace VentiCola.UI.Bindings
 
         private static readonly Func<Scrollbar, UnityEvent<float>> s_OnValueChangedGetter = (Scrollbar self) => self.onValueChanged;
 
-        public static Scrollbar onValueChanged(this Scrollbar self, UnityAction<float> handler)
+        public static Scrollbar onValueChanged(this Scrollbar self, Action<Scrollbar, float> handler)
         {
             BindingUtility.BindComponentEvent(self.gameObject, s_OnValueChangedGetter, handler);
             return self;

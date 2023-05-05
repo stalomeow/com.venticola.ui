@@ -13,19 +13,19 @@ namespace VentiCola.UI.Bindings
         private static readonly Func<Image, Sprite> s_SpriteGetter = (Image self) => self.sprite;
         private static readonly Action<Image, Sprite> s_SpriteSetter = (Image self, Sprite value) => self.sprite = value;
 
-        public static Image sprite(this Image self, Func<Sprite> value)
+        public static Image sprite(this Image self, Func<Image, Sprite> value)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_SpriteGetter, s_SpriteSetter, value);
             return self;
         }
 
-        public static Image sprite(this Image self, Func<Sprite> value, in TransitionConfig transitionConfig)
+        public static Image sprite(this Image self, Func<Image, Sprite> value, in TransitionConfig transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_SpriteGetter, s_SpriteSetter, value, in transitionConfig);
             return self;
         }
 
-        public static Image sprite(this Image self, Func<Sprite> value, SharedValue<TransitionConfig> transitionConfig)
+        public static Image sprite(this Image self, Func<Image, Sprite> value, SharedValue<TransitionConfig> transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_SpriteGetter, s_SpriteSetter, value, transitionConfig);
             return self;
@@ -38,19 +38,19 @@ namespace VentiCola.UI.Bindings
         private static readonly Func<Image, float> s_FillAmountGetter = (Image self) => self.fillAmount;
         private static readonly Action<Image, float> s_FillAmountSetter = (Image self, float value) => self.fillAmount = value;
 
-        public static Image fillAmount(this Image self, Func<float> value)
+        public static Image fillAmount(this Image self, Func<Image, float> value)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_FillAmountGetter, s_FillAmountSetter, value);
             return self;
         }
 
-        public static Image fillAmount(this Image self, Func<float> value, in TransitionConfig transitionConfig)
+        public static Image fillAmount(this Image self, Func<Image, float> value, in TransitionConfig transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_FillAmountGetter, s_FillAmountSetter, value, in transitionConfig);
             return self;
         }
 
-        public static Image fillAmount(this Image self, Func<float> value, SharedValue<TransitionConfig> transitionConfig)
+        public static Image fillAmount(this Image self, Func<Image, float> value, SharedValue<TransitionConfig> transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_FillAmountGetter, s_FillAmountSetter, value, transitionConfig);
             return self;

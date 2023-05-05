@@ -13,19 +13,19 @@ namespace VentiCola.UI.Bindings
         private static readonly Func<RawImage, Texture> s_TextureGetter = (RawImage self) => self.texture;
         private static readonly Action<RawImage, Texture> s_TextureSetter = (RawImage self, Texture value) => self.texture = value;
 
-        public static RawImage texture(this RawImage self, Func<Texture> value)
+        public static RawImage texture(this RawImage self, Func<RawImage, Texture> value)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_TextureGetter, s_TextureSetter, value);
             return self;
         }
 
-        public static RawImage texture(this RawImage self, Func<Texture> value, in TransitionConfig transitionConfig)
+        public static RawImage texture(this RawImage self, Func<RawImage, Texture> value, in TransitionConfig transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_TextureGetter, s_TextureSetter, value, in transitionConfig);
             return self;
         }
 
-        public static RawImage texture(this RawImage self, Func<Texture> value, SharedValue<TransitionConfig> transitionConfig)
+        public static RawImage texture(this RawImage self, Func<RawImage, Texture> value, SharedValue<TransitionConfig> transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_TextureGetter, s_TextureSetter, value, transitionConfig);
             return self;

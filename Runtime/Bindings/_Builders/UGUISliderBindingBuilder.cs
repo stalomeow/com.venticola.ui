@@ -13,19 +13,19 @@ namespace VentiCola.UI.Bindings
         private static readonly Func<Slider, float> s_ValueGetter = (Slider self) => self.value;
         private static readonly Action<Slider, float> s_ValueSetter = (Slider self, float value) => self.value = value;
 
-        public static Slider value(this Slider self, Func<float> value)
+        public static Slider value(this Slider self, Func<Slider, float> value)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_ValueGetter, s_ValueSetter, value);
             return self;
         }
 
-        public static Slider value(this Slider self, Func<float> value, in TransitionConfig transitionConfig)
+        public static Slider value(this Slider self, Func<Slider, float> value, in TransitionConfig transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_ValueGetter, s_ValueSetter, value, in transitionConfig);
             return self;
         }
 
-        public static Slider value(this Slider self, Func<float> value, SharedValue<TransitionConfig> transitionConfig)
+        public static Slider value(this Slider self, Func<Slider, float> value, SharedValue<TransitionConfig> transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_ValueGetter, s_ValueSetter, value, transitionConfig);
             return self;
@@ -37,7 +37,7 @@ namespace VentiCola.UI.Bindings
 
         private static readonly Func<Slider, UnityEvent<float>> s_OnValueChangedGetter = (Slider self) => self.onValueChanged;
 
-        public static Slider onValueChanged(this Slider self, UnityAction<float> handler)
+        public static Slider onValueChanged(this Slider self, Action<Slider, float> handler)
         {
             BindingUtility.BindComponentEvent(self.gameObject, s_OnValueChangedGetter, handler);
             return self;

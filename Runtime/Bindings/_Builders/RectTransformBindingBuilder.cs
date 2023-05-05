@@ -16,19 +16,19 @@ namespace VentiCola.UI.Bindings
             self.anchoredPosition = pos;
         };
 
-        public static RectTransform anchoredPositionY(this RectTransform self, Func<float> value)
+        public static RectTransform anchoredPositionY(this RectTransform self, Func<RectTransform, float> value)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_AnchoredPositionYGetter, s_AnchoredPositionYSetter, value);
             return self;
         }
 
-        public static RectTransform anchoredPositionY(this RectTransform self, Func<float> value, in TransitionConfig transitionConfig)
+        public static RectTransform anchoredPositionY(this RectTransform self, Func<RectTransform, float> value, in TransitionConfig transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_AnchoredPositionYGetter, s_AnchoredPositionYSetter, value, in transitionConfig);
             return self;
         }
 
-        public static RectTransform anchoredPositionY(this RectTransform self, Func<float> value, SharedValue<TransitionConfig> transitionConfig)
+        public static RectTransform anchoredPositionY(this RectTransform self, Func<RectTransform, float> value, SharedValue<TransitionConfig> transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_AnchoredPositionYGetter, s_AnchoredPositionYSetter, value, transitionConfig);
             return self;

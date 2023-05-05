@@ -6,7 +6,7 @@ namespace VentiCola.UI.Bindings
 {
     public static class VisibilityBindingBuilder
     {
-        public static GameObject ShowIf(this GameObject self, Func<bool> condition, Action renderAction = null)
+        public static GameObject ShowIf(this GameObject self, Func<GameObject, bool> condition, Action renderAction = null)
         {
             BaseBinding
                 .Allocate<IfBinding>()

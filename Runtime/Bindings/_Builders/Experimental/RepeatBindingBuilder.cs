@@ -7,7 +7,7 @@ namespace VentiCola.UI.Bindings.Experimental
 {
     public static class RepeatBindingBuilder
     {
-        public static GameObject RepeatForEachOf<T>(this GameObject self, Func<ReactiveList<T>> collection, Action<int, T> renderItemAction = null)
+        public static GameObject RepeatForEachOf<T>(this GameObject self, Func<GameObject, ReactiveList<T>> collection, Action<int, T> renderItemAction = null)
         {
             BaseBinding
                 .Allocate<ForEachBinding<T>>()

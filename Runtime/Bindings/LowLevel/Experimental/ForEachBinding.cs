@@ -10,7 +10,7 @@ namespace VentiCola.UI.Bindings.LowLevel.Experimental
 
     public class ForEachBinding<T> : BaseBinding
     {
-        private Func<IReactiveCollection> m_CollectionFunc;
+        private Func<GameObject, IReactiveCollection> m_CollectionFunc;
 
         //private IEqualityComparer<T> m_EqualityComparer;
         private Action<int, T> m_RenderItemAction;
@@ -21,7 +21,7 @@ namespace VentiCola.UI.Bindings.LowLevel.Experimental
 
         public void Initalize(
             GameObject mountTarget,
-            Func<IReactiveCollection> collectionFunc,
+            Func<GameObject, IReactiveCollection> collectionFunc,
             Action<int, T> renderItemAction)
         {
             BaseInitialize(ref mountTarget);
@@ -52,7 +52,7 @@ namespace VentiCola.UI.Bindings.LowLevel.Experimental
             // clear old items
             DetachChildren(Range.All, child => Object.Destroy(child.MountTarget));
 
-            IReactiveCollection collection = m_CollectionFunc();
+            IReactiveCollection collection = m_CollectionFunc(MountTarget);
 
             for (int i = 0; i < collection.Count; i++)
             {

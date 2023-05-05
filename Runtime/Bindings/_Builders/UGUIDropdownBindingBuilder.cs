@@ -14,19 +14,19 @@ namespace VentiCola.UI.Bindings
         private static readonly Func<Dropdown, int> s_ValueGetter = (Dropdown self) => self.value;
         private static readonly Action<Dropdown, int> s_ValueSetter = (Dropdown self, int value) => self.value = value;
 
-        public static Dropdown value(this Dropdown self, Func<int> value)
+        public static Dropdown value(this Dropdown self, Func<Dropdown, int> value)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_ValueGetter, s_ValueSetter, value);
             return self;
         }
 
-        public static Dropdown value(this Dropdown self, Func<int> value, in TransitionConfig transitionConfig)
+        public static Dropdown value(this Dropdown self, Func<Dropdown, int> value, in TransitionConfig transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_ValueGetter, s_ValueSetter, value, in transitionConfig);
             return self;
         }
 
-        public static Dropdown value(this Dropdown self, Func<int> value, SharedValue<TransitionConfig> transitionConfig)
+        public static Dropdown value(this Dropdown self, Func<Dropdown, int> value, SharedValue<TransitionConfig> transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_ValueGetter, s_ValueSetter, value, transitionConfig);
             return self;
@@ -39,19 +39,19 @@ namespace VentiCola.UI.Bindings
         private static readonly Func<Dropdown, List<Dropdown.OptionData>> s_OptionsGetter = (Dropdown self) => self.options;
         private static readonly Action<Dropdown, List<Dropdown.OptionData>> s_OptionsSetter = (Dropdown self, List<Dropdown.OptionData> value) => self.options = value;
 
-        public static Dropdown options(this Dropdown self, Func<List<Dropdown.OptionData>> value)
+        public static Dropdown options(this Dropdown self, Func<Dropdown, List<Dropdown.OptionData>> value)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_OptionsGetter, s_OptionsSetter, value);
             return self;
         }
 
-        public static Dropdown options(this Dropdown self, Func<List<Dropdown.OptionData>> value, in TransitionConfig transitionConfig)
+        public static Dropdown options(this Dropdown self, Func<Dropdown, List<Dropdown.OptionData>> value, in TransitionConfig transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_OptionsGetter, s_OptionsSetter, value, in transitionConfig);
             return self;
         }
 
-        public static Dropdown options(this Dropdown self, Func<List<Dropdown.OptionData>> value, SharedValue<TransitionConfig> transitionConfig)
+        public static Dropdown options(this Dropdown self, Func<Dropdown, List<Dropdown.OptionData>> value, SharedValue<TransitionConfig> transitionConfig)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_OptionsGetter, s_OptionsSetter, value, transitionConfig);
             return self;
@@ -63,7 +63,7 @@ namespace VentiCola.UI.Bindings
 
         private static readonly Func<Dropdown, UnityEvent<int>> s_OnValueChangedGetter = (Dropdown self) => self.onValueChanged;
 
-        public static Dropdown onValueChanged(this Dropdown self, UnityAction<int> handler)
+        public static Dropdown onValueChanged(this Dropdown self, Action<Dropdown, int> handler)
         {
             BindingUtility.BindComponentEvent(self.gameObject, s_OnValueChangedGetter, handler);
             return self;

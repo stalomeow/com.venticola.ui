@@ -313,12 +313,12 @@ View.Text.text = Something;
 
 ``` c#
 // 在指定的地方写一次即可，如果 Something 是响应式的，之后会自动更新 Text
-View.Text.text(() => Something);
+View.Text.text(_ => Something);
 
 // 还可以链式绑定
 View.Text
-    .text(() => Something)
-    .fontSize(() => SomethingElse);
+    .text(_ => Something)
+    .fontSize(_ => SomethingElse);
 ```
 
 下面是一个较完整的示例：
@@ -344,7 +344,7 @@ public class ExampleController : BaseUIPageController<ExamplePage>
     protected override void SetUpViewBindings()
     {
         // 在这之后，当 MessageA 或 MessageB 变化时，Text 会被自动更新
-        View.Text.text(() => $"A: {MessageA}\nB: {MessageB}");
+        View.Text.text(_ => $"A: {MessageA}\nB: {MessageB}");
     }
 }
 ```
@@ -355,7 +355,7 @@ public class ExampleController : BaseUIPageController<ExamplePage>
 
 ``` c#
 // 绑定事件。当页面关闭后自动取消事件回调
-View.Button.onClick(() => { /* ... */ });
+View.Button.onClick(_ => { /* ... */ });
 ```
 
 事件也可以链式绑定，还可以和属性一起混合链式绑定。
@@ -438,7 +438,7 @@ View.Button.onClick(() => { /* ... */ });
 
 ``` c#
 // 只有 condition 为 true 时 OneGameObject 及其子物体才会显示
-View.OneGameObject.ShowIf(() => condition, () =>
+View.OneGameObject.ShowIf(_ => condition, () =>
 {
     // nested bindings
     // 在此处编写 OneGameObject 的子物体上的绑定
@@ -453,7 +453,7 @@ View.OneGameObject.ShowIf(() => condition, () =>
 ``` c#
 // 需要引入 VentiCola.UI.Bindings.Experimental 命名空间
 // collection 目前只能是 ReactiveList<T> 的实例
-View.OneGameObject.RepeatForEachOf(() => collection, (int index, ElementType element) =>
+View.OneGameObject.RepeatForEachOf(_ => collection, (int index, ElementType element) =>
 {
     // nested bindings
     // 在此处编写 OneGameObject 的子物体上的绑定
@@ -513,7 +513,7 @@ public static Toggle onValueChanged(this Toggle self, UnityAction<bool> handler)
 // 例如下面的代码
 // 当 SomeFloat 变化时会立即使用指定的三阶贝塞尔曲线执行 0.2s 忽略时间缩放的过渡动画
 // fillAmount 会从原来的值平滑过渡到新的值
-View.Image.fillAmount(() => SomeFloat, TransitionConfig.With(
+View.Image.fillAmount(_ => SomeFloat, TransitionConfig.With(
     duration: 0.2f,
     // TransitionConfig 和 EasingCurve 都是值类型！
     easing: new EasingCurve((0.25f, 0.1f), (0.25f, 1f))

@@ -7,7 +7,7 @@ namespace VentiCola.UI.Bindings.LowLevel
 {
     public class IfBinding : BaseBinding
     {
-        private Func<bool> m_ConditionFunc;
+        private Func<GameObject, bool> m_ConditionFunc;
         private Action m_RenderAction;
 
         // 用 CanvasGroup 代替 SetActive，提高性能
@@ -16,7 +16,7 @@ namespace VentiCola.UI.Bindings.LowLevel
 
         public void Initialize(
             GameObject mountTarget,
-            Func<bool> conditionFunc,
+            Func<GameObject, bool> conditionFunc,
             Action renderAction)
         {
             BaseInitialize(ref mountTarget);
@@ -38,7 +38,7 @@ namespace VentiCola.UI.Bindings.LowLevel
 
         protected override void OnExecute(IAnimationUpdater animationUpdater)
         {
-            m_CurrentCondition = m_ConditionFunc();
+            m_CurrentCondition = m_ConditionFunc(MountTarget);
 
             if (m_CurrentCondition)
             {

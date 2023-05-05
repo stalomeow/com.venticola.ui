@@ -12,7 +12,7 @@ namespace VentiCola.UI.Bindings
 
         private static readonly Func<Button, UnityEvent> s_OnClickGetter = (Button self) => self.onClick;
 
-        public static Button onClick(this Button self, UnityAction handler)
+        public static Button onClick(this Button self, Action<Button> handler)
         {
             BindingUtility.BindComponentEvent(self.gameObject, s_OnClickGetter, handler);
             return self;
