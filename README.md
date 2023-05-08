@@ -109,7 +109,7 @@ using VentiCola.UI.Specialized;
 
 public class HelloWorldPageController : BaseUIPageController<HelloWorldPage>
 {
-    // 共有属性，用于外部传参
+    // 公有属性，用于外部传参
     public string DisplayString { get; set; }
 
     public HelloWorldPageController()
@@ -476,7 +476,7 @@ Unity 还有其他类库有那么多 API，框架不可能一个一个一个全�
 
 ``` c#
 // 在某处声明一个扩展方法
-public static Text text(this Text self, Func<string> value)
+public static Text text(this Text self, Func<Text, string> value)
 {
     BindingUtility.BindComponentValue(
         self.gameObject,                  // Text 所在的 GameObject
@@ -491,7 +491,7 @@ public static Text text(this Text self, Func<string> value)
 
 ``` c#
 // 在某处声明一个扩展方法
-public static Toggle onValueChanged(this Toggle self, UnityAction<bool> handler)
+public static Toggle onValueChanged(this Toggle self, Action<Toggle, bool> handler)
 {
     BindingUtility.BindComponentEvent(
         self.gameObject,                  // Toggle 所在的 GameObject
