@@ -189,70 +189,70 @@ namespace VentiColaTests.UI
             BindTopBar();
             BindTabs();
 
-            View.canvasGroup.alpha(() => PageAlpha, in View.PageAlphaTransConfig);
-            View.CloseButton.onClick(() => Singleton<ResourcesUIManager>.Instance.Close(this));
+            View.canvasGroup.alpha(_ => PageAlpha, in View.PageAlphaTransConfig);
+            View.CloseButton.onClick(_ => Singleton<ResourcesUIManager>.Instance.Close(this));
 
-            View.PropertiesTab.ShowIf(() => CurrentTab == TabType.Properties, () =>
+            View.PropertiesTab.ShowIf(_ => CurrentTab == TabType.Properties, () =>
             {
-                View.CharNameText.text(() => CurrentChar.Name);
-                View.CharLevelText.text(() => $"等级{CurrentChar.Level} / {CurrentChar.MaxLevel}");
+                View.CharNameText.text(_ => CurrentChar.Name);
+                View.CharLevelText.text(_ => $"等级{CurrentChar.Level} / {CurrentChar.MaxLevel}");
 
-                View.CharExpBarInnerImage.fillAmount(() => CurrentChar.ExpBarFillAmount, View.ExpBarFillAmountTransConfig);
-                View.CharExpBarLabelText.text(() => $"{CurrentChar.Exp} / {CurrentChar.MaxExp}");
+                View.CharExpBarInnerImage.fillAmount(_ => CurrentChar.ExpBarFillAmount, View.ExpBarFillAmountTransConfig);
+                View.CharExpBarLabelText.text(_ => $"{CurrentChar.Exp} / {CurrentChar.MaxExp}");
 
-                View.CharMaxHPValueText.text(() => CurrentChar.MaxHp.ToString());
-                View.CharATKValueText.text(() => CurrentChar.ATK.ToString());
-                View.CharDEFValueText.text(() => CurrentChar.DEF.ToString());
+                View.CharMaxHPValueText.text(_ => CurrentChar.MaxHp.ToString());
+                View.CharATKValueText.text(_ => CurrentChar.ATK.ToString());
+                View.CharDEFValueText.text(_ => CurrentChar.DEF.ToString());
 
-                View.CharLoveLevelValueText.text(() => CurrentChar.LoveLevel.ToString());
-                View.CharLoveBarInnerImage.fillAmount(() => CurrentChar.LoveExpBarFillAmount, View.LoveBarFillAmountTransConfig);
+                View.CharLoveLevelValueText.text(_ => CurrentChar.LoveLevel.ToString());
+                View.CharLoveBarInnerImage.fillAmount(_ => CurrentChar.LoveExpBarFillAmount, View.LoveBarFillAmountTransConfig);
 
-                View.CharDescText.text(() => CurrentChar.Desc);
+                View.CharDescText.text(_ => CurrentChar.Desc);
             });
 
-            View.WeaponTab.ShowIf(() => CurrentTab == TabType.Weapon);
+            View.WeaponTab.ShowIf(_ => CurrentTab == TabType.Weapon);
 
-            View.TalentTab.ShowIf(() => CurrentTab == TabType.Talent, () =>
+            View.TalentTab.ShowIf(_ => CurrentTab == TabType.Talent, () =>
             {
-                View.TalentItem.RepeatForEachOf(() => CurrentChar.Talents, (int index, TalentModel talentModel) =>
+                View.TalentItem.RepeatForEachOf(_ => CurrentChar.Talents, (ForEachItem<TalentModel> item) =>
                 {
-                    View.TalentItemNameText.text(() => talentModel.Name);
-                    View.TalentItemLevelText.text(() => $"Lv.{talentModel.Level}");
-                    View.TalentItemIconImage.sprite(() => talentModel.Icon);
+                    View.TalentItemNameText.text(_ => item.Value.Name);
+                    View.TalentItemLevelText.text(_ => $"Lv.{item.Value.Level}");
+                    View.TalentItemIconImage.sprite(_ => item.Value.Icon);
                 });
             });
 
-            View.InfoTab.ShowIf(() => CurrentTab == TabType.Info);
+            View.InfoTab.ShowIf(_ => CurrentTab == TabType.Info);
         }
 
         private void BindTopBar()
         {
-            View.CharInfoText.text(() => $"{CurrentChar.ElementType}元素 / {CurrentChar.Name}");
+            View.CharInfoText.text(_ => $"{CurrentChar.ElementType}元素 / {CurrentChar.Name}");
 
-            View.CharListItemObj.RepeatForEachOf(() => CharacterModel.Characters, (int index, CharacterModel charModel) =>
+            View.CharListItemObj.RepeatForEachOf(_ => CharacterModel.Characters, (ForEachItem<CharacterModel> item) =>
             {
-                View.CharListItemImage.sprite(() => charModel.Avatar);
-                View.CharListItemButton.onClick(() => CurrentChar = charModel);
+                View.CharListItemImage.sprite(_ => item.Value.Avatar);
+                View.CharListItemButton.onClick(_ => CurrentChar = item.Value);
             });
         }
 
         private void BindTabs()
         {
             View.PropertiesTabToggle
-                .isOn(() => CurrentTab == TabType.Properties)
-                .onValueChanged(value => SwitchTab(value, TabType.Properties));
+                .isOn(_ => CurrentTab == TabType.Properties)
+                .onValueChanged((_, value) => SwitchTab(value, TabType.Properties));
 
             View.WeaponTabToggle
-                .isOn(() => CurrentTab == TabType.Weapon)
-                .onValueChanged(value => SwitchTab(value, TabType.Weapon));
+                .isOn(_ => CurrentTab == TabType.Weapon)
+                .onValueChanged((_, value) => SwitchTab(value, TabType.Weapon));
 
             View.TalentTabToggle
-                .isOn(() => CurrentTab == TabType.Talent)
-                .onValueChanged(value => SwitchTab(value, TabType.Talent));
+                .isOn(_ => CurrentTab == TabType.Talent)
+                .onValueChanged((_ ,value) => SwitchTab(value, TabType.Talent));
 
             View.InfoTabToggle
-                .isOn(() => CurrentTab == TabType.Info)
-                .onValueChanged(value => SwitchTab(value, TabType.Info));
+                .isOn(_ => CurrentTab == TabType.Info)
+                .onValueChanged((_, value) => SwitchTab(value, TabType.Info));
         }
     }
 }

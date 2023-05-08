@@ -70,21 +70,21 @@ namespace VentiColaTests.UI
 
         protected override void SetUpViewBindings()
         {
-            View.canvasGroup.alpha(() => PageAlpha, in View.AlphaTransConfig);
-            View.BoxTransform.anchoredPositionY(() => BoxPositionY, in View.PositionTransConfig);
+            View.canvasGroup.alpha(_ => PageAlpha, in View.AlphaTransConfig);
+            View.BoxTransform.anchoredPositionY(_ => BoxPositionY, in View.PositionTransConfig);
 
-            View.TitleText.text(() => Title);
-            View.MessageText.text(() => Message);
-            View.ConfirmButtonText.text(() => ConfirmButtonText);
-            View.CancelButtonText.text(() => CancelButtonText);
+            View.TitleText.text(_ => Title);
+            View.MessageText.text(_ => Message);
+            View.ConfirmButtonText.text(_ => ConfirmButtonText);
+            View.CancelButtonText.text(_ => CancelButtonText);
 
-            View.ConfirmButton.onClick(() =>
+            View.ConfirmButton.onClick(_ =>
             {
                 OnConfirm?.Invoke();
                 Singleton<ResourcesUIManager>.Instance.Close(this);
             });
 
-            View.CancelButton.onClick(() =>
+            View.CancelButton.onClick(_ =>
             {
                 OnCancel?.Invoke();
                 Singleton<ResourcesUIManager>.Instance.Close(this);
