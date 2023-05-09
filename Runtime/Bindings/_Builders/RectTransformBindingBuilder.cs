@@ -6,6 +6,32 @@ namespace VentiCola.UI.Bindings
 {
     public static class RectTransformBindingBuilder
     {
+        #region AnchoredPosition
+
+        private static readonly Func<RectTransform, Vector2> s_AnchoredPositionGetter = (RectTransform self) => self.anchoredPosition;
+        private static readonly Action<RectTransform, Vector2> s_AnchoredPositionSetter = (RectTransform self, Vector2 value) => self.anchoredPosition = value;
+
+
+        public static RectTransform anchoredPosition(this RectTransform self, Func<RectTransform, Vector2> value)
+        {
+            BindingUtility.BindComponentValue(self.gameObject, s_AnchoredPositionGetter, s_AnchoredPositionSetter, value);
+            return self;
+        }
+
+        public static RectTransform anchoredPosition(this RectTransform self, Func<RectTransform, Vector2> value, in TransitionConfig transitionConfig)
+        {
+            BindingUtility.BindComponentValue(self.gameObject, s_AnchoredPositionGetter, s_AnchoredPositionSetter, value, in transitionConfig);
+            return self;
+        }
+
+        public static RectTransform anchoredPosition(this RectTransform self, Func<RectTransform, Vector2> value, SharedValue<TransitionConfig> transitionConfig)
+        {
+            BindingUtility.BindComponentValue(self.gameObject, s_AnchoredPositionGetter, s_AnchoredPositionSetter, value, transitionConfig);
+            return self;
+        }
+
+        #endregion
+
         #region AnchoredPositionY
 
         private static readonly Func<RectTransform, float> s_AnchoredPositionYGetter = (RectTransform self) => self.anchoredPosition.y;
