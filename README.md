@@ -379,6 +379,7 @@ View.Button.onClick(_ => { /* ... */ });
 
 - `RectTransform`
 
+    - `anchoredPosition`
     - `anchoredPosition.y`
 
 - `Button`
