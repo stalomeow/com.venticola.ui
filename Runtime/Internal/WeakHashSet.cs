@@ -79,7 +79,7 @@ namespace VentiCola.UI.Internal
             }
 
             ScavengeDeadEntriesIfNeeded(excludeBucketIndex: bucketIndex); // exclude the bucket which has been gone through above
-            int entryIndex = GetNewEntryIndex(hashCode, ref bucket, ref bucketIndex);
+            bucket = ref GetNewEntryIndex(hashCode, ref bucket, ref bucketIndex, out int entryIndex);
             ref Entry entry = ref m_Entries[entryIndex];
 
             entry.Handle = GCHandle.Alloc(item, GCHandleType.Weak);
@@ -179,24 +179,24 @@ namespace VentiCola.UI.Internal
             }
         }
 
-        private int GetNewEntryIndex(uint hashCode, ref int bucket, ref uint bucketIndex)
+        private ref int GetNewEntryIndex(uint hashCode, ref int bucketPtr, ref uint bucketIndex, out int entryIndex)
         {
             if (m_FreeList >= 0)
             {
-                int index = m_FreeList;
-                m_FreeList = m_Entries[index].Next;
-                return index;
+                entryIndex = m_FreeList;
+                m_FreeList = m_Entries[entryIndex].Next;
             }
-
-            if (m_Count >= m_Entries.Length)
+            else if (m_Count >= m_Entries.Length)
             {
                 Resize();
 
                 // recalculate
-                bucket = ref GetBucket(hashCode, out bucketIndex);
+                // **修改 bucket 指针，不是 bucket 指针指向的值**
+                bucketPtr = ref GetBucket(hashCode, out bucketIndex);
             }
 
-            return m_Count++;
+            entryIndex = m_Count++;
+            return ref bucketPtr; // 返回 bucket 指针
         }
 
         private bool FindItemInBucket(ref int bucket, T item, uint hashCode, out int itemEntryIndex, out int itemPrevEntryIndex)
