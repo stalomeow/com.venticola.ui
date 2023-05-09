@@ -11,7 +11,6 @@ namespace VentiCola.UI.Bindings
         private static readonly Func<RectTransform, Vector2> s_AnchoredPositionGetter = (RectTransform self) => self.anchoredPosition;
         private static readonly Action<RectTransform, Vector2> s_AnchoredPositionSetter = (RectTransform self, Vector2 value) => self.anchoredPosition = value;
 
-
         public static RectTransform anchoredPosition(this RectTransform self, Func<RectTransform, Vector2> value)
         {
             BindingUtility.BindComponentValue(self.gameObject, s_AnchoredPositionGetter, s_AnchoredPositionSetter, value);
