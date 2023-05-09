@@ -83,6 +83,11 @@ namespace VentiCola.UI.Bindings.Experimental
             }
         }
 
+        protected internal TKey GetKeyDirect()
+        {
+            return m_Key;
+        }
+
         protected internal override void Reset()
         {
             if (RuntimeHelpers.IsReferenceOrContainsReferences<TKey>())

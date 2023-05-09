@@ -77,7 +77,8 @@ namespace VentiCola.UI.Bindings.LowLevel.Experimental
 
             while (startIndex1 <= endIndex1 && startIndex2 <= endIndex2)
             {
-                if (m_EqualityComparer.Equals(list[startIndex1], m_Items[startIndex2].Value))
+                // 不能调用 ForEachItem<T>.Value，因为 Value 会做依赖收集！
+                if (m_EqualityComparer.Equals(list[startIndex1], m_Items[startIndex2].GetValueDirect()))
                 {
                     startIndex1++;
                     startIndex2++;
@@ -90,7 +91,8 @@ namespace VentiCola.UI.Bindings.LowLevel.Experimental
 
             while (startIndex1 <= endIndex1 && startIndex2 <= endIndex2)
             {
-                if (m_EqualityComparer.Equals(list[endIndex1], m_Items[endIndex2].Value))
+                // 不能调用 ForEachItem<T>.Value，因为 Value 会做依赖收集！
+                if (m_EqualityComparer.Equals(list[endIndex1], m_Items[endIndex2].GetValueDirect()))
                 {
                     endIndex1--;
                     endIndex2--;
