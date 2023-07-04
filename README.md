@@ -6,7 +6,7 @@
 
 ## 导入
 
-打开 Package Manager，点击左上角加号，选择 Add package from git URL...，输入 https://github.com/Jin-Yuhan/com.venticola.ui.git 后点击 Add。
+打开 Package Manager，点击左上角加号，选择 Add package from git URL...，输入 https://github.com/stalomeow/com.venticola.ui.git 后点击 Add。
 
 ## 配置
 
